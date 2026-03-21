@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { 
@@ -9,50 +9,25 @@ import {
   Clock, 
   Copy,
   Check,
-  Loader2
+  Loader2,
+  Zap
 } from 'lucide-react';
 import { analyzeApi, uploadApi, getUserId } from '@/lib/api';
 import Link from 'next/link';
 
-interface TechnicalPoint {
-  term: string;
-  inContext: string;
-  whyMentioned: string;
-  realImpact: string;
-  analogy: string;
-}
-
-interface DialogContext {
-  speakers: string[];
-  summary: string;
-  background: string;
-}
-
-interface IntentVerdict {
-  judgment: string;
-  reason: string;
-  confidence: string;
-}
-
-interface AnalysisResult {
-  dialogContext?: DialogContext;
-  technicalPoints?: TechnicalPoint[];
-  intentVerdict?: IntentVerdict;
-  scripts?: string[];
-  followUp?: string[];
-  knowledge?: {
-    summary: string;
-    details: string[];
-  };
-  recordId?: string;
-}
+// 高频场景
+const QUICK_SCENARIOS = [
+  { label: '说做不了', text: '这个需求技术上实现不了' },
+  { label: '要重构', text: '这个要做架构重构，工作量很大' },
+  { label: '排期长', text: '这个需求至少需要两周时间' },
+  { label: '有风险', text: '这样做会有风险，可能影响现有功能' },
+];
 
 export default function HomePage() {
   const [inputText, setInputText] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
-  const [streamingContent, setStreamingContent] = useState('');
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<string>('');
+  const [copiedText, setCopiedText] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -114,8 +89,7 @@ export default function HomePage() {
   const handleAnalyze = useCallback(async () => {
     if (!inputText.trim() || isAnalyzing) return;
     setIsAnalyzing(true);
-    setAnalysisResult(null);
-    setStreamingContent('');
+    setAnalysisResult('');
     
     try {
       const stream = await analyzeApi.stream(inputText, 'concise');
@@ -137,16 +111,11 @@ export default function HomePage() {
               const parsed = JSON.parse(data);
               if (parsed.content) {
                 fullContent += parsed.content;
-                setStreamingContent(fullContent);
+                setAnalysisResult(fullContent);
               }
             } catch {}
           }
         }
-      }
-      
-      const jsonMatch = fullContent.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        setAnalysisResult(JSON.parse(jsonMatch[0]));
       }
     } catch {
       alert('分析失败');
@@ -155,10 +124,161 @@ export default function HomePage() {
     }
   }, [inputText, isAnalyzing]);
 
-  const copyText = async (text: string, idx: number) => {
+  const copyText = async (text: string) => {
     await navigator.clipboard.writeText(text);
-    setCopiedIndex(idx);
-    setTimeout(() => setCopiedIndex(null), 2000);
+    setCopiedText(text);
+    setTimeout(() => setCopiedText(null), 2000);
+  };
+
+  // 简单的 Markdown 渲染
+  const renderMarkdown = (content: string): React.ReactNode => {
+    const lines = content.split('\n');
+    const elements: React.ReactNode[] = [];
+    let inQuote = false;
+    let quoteContent: string[] = [];
+    let inList = false;
+    let listItems: string[] = [];
+
+    const flushQuote = () => {
+      if (quoteContent.length > 0) {
+        elements.push(
+          <div key={`quote-${elements.length}`} className="bg-neutral-50 border-l-2 border-neutral-800 pl-3 py-2 my-2 group relative">
+            <div className="text-sm text-neutral-800 whitespace-pre-wrap leading-relaxed pr-8">
+              {quoteContent.join('\n')}
+            </div>
+            <button
+              onClick={() => copyText(quoteContent.join('\n'))}
+              className="absolute top-2 right-2 p-1.5 rounded opacity-0 group-hover:opacity-100 hover:bg-neutral-200 transition-all"
+            >
+              {copiedText === quoteContent.join('\n') ? (
+                <Check className="w-3.5 h-3.5 text-neutral-600" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-neutral-400" />
+              )}
+            </button>
+          </div>
+        );
+        quoteContent = [];
+      }
+    };
+
+    const flushList = () => {
+      if (listItems.length > 0) {
+        elements.push(
+          <div key={`list-${elements.length}`} className="space-y-1 my-2">
+            {listItems.map((item, i) => (
+              <div key={i} className="flex gap-2 text-sm text-neutral-700 group relative">
+                <span className="text-neutral-400 shrink-0">•</span>
+                <span className="flex-1">{item}</span>
+                <button
+                  onClick={() => copyText(item)}
+                  className="shrink-0 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-neutral-100 transition-all"
+                >
+                  {copiedText === item ? (
+                    <Check className="w-3 h-3 text-neutral-600" />
+                  ) : (
+                    <Copy className="w-3 h-3 text-neutral-400" />
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
+        );
+        listItems = [];
+      }
+    };
+
+    lines.forEach((line, idx) => {
+      // 引用块
+      if (line.startsWith('> ')) {
+        flushList();
+        inQuote = true;
+        quoteContent.push(line.slice(2));
+        return;
+      }
+      
+      if (inQuote && line.startsWith('> ')) {
+        quoteContent.push(line.slice(2));
+        return;
+      }
+      
+      if (inQuote) {
+        flushQuote();
+        inQuote = false;
+      }
+
+      // 列表
+      if (line.startsWith('- ')) {
+        flushQuote();
+        inList = true;
+        listItems.push(line.slice(2));
+        return;
+      }
+
+      if (line.startsWith('1. ') || line.startsWith('2. ') || line.startsWith('3. ') || line.startsWith('4. ')) {
+        flushQuote();
+        inList = true;
+        listItems.push(line.replace(/^\d+\.\s*/, ''));
+        return;
+      }
+
+      if (inList && line.trim() === '') {
+        flushList();
+        inList = false;
+      }
+
+      if (inList) {
+        // 继续列表项
+        if (!line.startsWith('- ') && !line.match(/^\d+\.\s/)) {
+          flushList();
+          inList = false;
+        }
+      }
+
+      // 标题
+      if (line.startsWith('**') && line.endsWith('**')) {
+        flushList();
+        const title = line.slice(2, -2);
+        elements.push(
+          <h3 key={idx} className="text-sm font-medium text-neutral-900 mt-5 mb-2 first:mt-0">
+            {title}
+          </h3>
+        );
+        return;
+      }
+
+      // 空行
+      if (line.trim() === '') {
+        flushList();
+        flushQuote();
+        return;
+      }
+
+      // 普通段落
+      flushList();
+      flushQuote();
+      
+      // 处理加粗
+      const parts = line.split(/(\*\*[^*]+\*\*)/g);
+      const renderedLine = parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return <strong key={i} className="font-medium text-neutral-900">{part.slice(2, -2)}</strong>;
+        }
+        return part;
+      });
+
+      elements.push(
+        <p key={idx} className="text-sm text-neutral-700 leading-relaxed mb-1">
+          {renderedLine}
+        </p>
+      );
+    });
+
+    // 处理结尾
+    flushQuote();
+    flushList();
+
+    return elements;
   };
 
   return (
@@ -185,11 +305,34 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Main Content - Full Height Split */}
+      {/* Main Content */}
       <main className="flex-1 flex overflow-hidden">
         {/* Left: Input */}
-        <div className="w-[400px] shrink-0 border-r border-neutral-100 flex flex-col">
+        <div className="w-[380px] shrink-0 border-r border-neutral-100 flex flex-col">
           <div className="p-4 flex-1 flex flex-col">
+            {/* Quick Scenarios */}
+            <div className="mb-3">
+              <div className="flex items-center gap-1.5 text-xs text-neutral-400 mb-2">
+                <Zap className="w-3 h-3" />
+                <span>高频场景</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {QUICK_SCENARIOS.map((scenario) => (
+                  <button
+                    key={scenario.label}
+                    onClick={() => {
+                      setInputText(scenario.text);
+                      textareaRef.current?.focus();
+                    }}
+                    className="px-2.5 py-1 text-xs bg-neutral-100 text-neutral-600 rounded hover:bg-neutral-200 transition-colors"
+                  >
+                    {scenario.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Input Area */}
             <div className="flex-1 flex flex-col">
               <Textarea
                 ref={textareaRef}
@@ -240,130 +383,28 @@ export default function HomePage() {
         {/* Right: Results */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-6 max-w-3xl">
-            {isAnalyzing && !analysisResult && streamingContent && (
-              <div className="text-neutral-400 text-sm whitespace-pre-wrap leading-relaxed">
-                {streamingContent}
+            {isAnalyzing && !analysisResult && (
+              <div className="flex items-center gap-2 text-neutral-400 text-sm">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>分析中...</span>
+              </div>
+            )}
+
+            {isAnalyzing && analysisResult && (
+              <div className="text-sm text-neutral-600 leading-relaxed">
+                {renderMarkdown(analysisResult)}
               </div>
             )}
 
             {!isAnalyzing && !analysisResult && (
               <div className="text-neutral-400 text-sm">
-                输入内容后点击分析
+                输入开发说的话，我来帮你分析
               </div>
             )}
 
-            {analysisResult && (
-              <div className="space-y-6">
-                {/* Dialog Context */}
-                {analysisResult.dialogContext && (
-                  <section>
-                    <h3 className="text-xs font-medium text-neutral-400 uppercase tracking-wide mb-2">对话背景</h3>
-                    <p className="text-sm text-neutral-700 leading-relaxed">{analysisResult.dialogContext.summary}</p>
-                    {analysisResult.dialogContext.background && (
-                      <p className="text-xs text-neutral-500 mt-1">{analysisResult.dialogContext.background}</p>
-                    )}
-                  </section>
-                )}
-
-                {/* Technical Points */}
-                {analysisResult.technicalPoints && analysisResult.technicalPoints.length > 0 && (
-                  <section>
-                    <h3 className="text-xs font-medium text-neutral-400 uppercase tracking-wide mb-3">技术点</h3>
-                    <div className="space-y-4">
-                      {analysisResult.technicalPoints.map((point, i) => (
-                        <div key={i} className="border-l-2 border-neutral-800 pl-3">
-                          <div className="font-medium text-neutral-900 text-sm">{point.term}</div>
-                          <p className="text-sm text-neutral-600 mt-1">{point.inContext}</p>
-                          <div className="mt-2 text-xs text-neutral-500 space-y-0.5">
-                            {point.whyMentioned && <p>为什么提：{point.whyMentioned}</p>}
-                            {point.realImpact && <p>实际影响：{point.realImpact}</p>}
-                            {point.analogy && <p className="text-neutral-400">类比：{point.analogy}</p>}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
-
-                {/* Intent */}
-                {analysisResult.intentVerdict && (
-                  <section>
-                    <h3 className="text-xs font-medium text-neutral-400 uppercase tracking-wide mb-2">意图判断</h3>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium text-neutral-900">{analysisResult.intentVerdict.judgment}</span>
-                      {analysisResult.intentVerdict.confidence && (
-                        <span className="text-xs text-neutral-400">置信度：{analysisResult.intentVerdict.confidence}</span>
-                      )}
-                    </div>
-                    <p className="text-sm text-neutral-600">{analysisResult.intentVerdict.reason}</p>
-                  </section>
-                )}
-
-                {/* Scripts */}
-                {analysisResult.scripts && analysisResult.scripts.length > 0 && (
-                  <section>
-                    <h3 className="text-xs font-medium text-neutral-400 uppercase tracking-wide mb-3">可以这样说</h3>
-                    <div className="space-y-2">
-                      {analysisResult.scripts.map((script, i) => (
-                        <div key={i} className="group relative bg-neutral-50 rounded p-3 pr-9">
-                          <p className="text-sm text-neutral-800 leading-relaxed">{script}</p>
-                          <button
-                            onClick={() => copyText(script, i)}
-                            className="absolute top-2 right-2 p-1.5 rounded opacity-0 group-hover:opacity-100 hover:bg-neutral-200 transition-all"
-                          >
-                            {copiedIndex === i ? (
-                              <Check className="w-3.5 h-3.5 text-neutral-600" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5 text-neutral-400" />
-                            )}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
-
-                {/* Follow Up */}
-                {analysisResult.followUp && analysisResult.followUp.length > 0 && (
-                  <section>
-                    <h3 className="text-xs font-medium text-neutral-400 uppercase tracking-wide mb-3">可以追问</h3>
-                    <div className="space-y-2">
-                      {analysisResult.followUp.map((q, i) => (
-                        <div key={i} className="group relative bg-neutral-50 rounded p-3 pr-9">
-                          <p className="text-sm text-neutral-700">{q}</p>
-                          <button
-                            onClick={() => copyText(q, i + 50)}
-                            className="absolute top-2 right-2 p-1.5 rounded opacity-0 group-hover:opacity-100 hover:bg-neutral-200 transition-all"
-                          >
-                            {copiedIndex === i + 50 ? (
-                              <Check className="w-3.5 h-3.5 text-neutral-600" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5 text-neutral-400" />
-                            )}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
-
-                {/* Knowledge */}
-                {analysisResult.knowledge && (
-                  <section>
-                    <h3 className="text-xs font-medium text-neutral-400 uppercase tracking-wide mb-2">补充知识</h3>
-                    <p className="text-sm text-neutral-600">{analysisResult.knowledge.summary}</p>
-                    {analysisResult.knowledge.details && (
-                      <ul className="mt-2 text-xs text-neutral-500 space-y-0.5">
-                        {analysisResult.knowledge.details.map((d, i) => (
-                          <li key={i} className="flex gap-2">
-                            <span className="text-neutral-300">•</span>
-                            <span>{d}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </section>
-                )}
+            {!isAnalyzing && analysisResult && (
+              <div className="text-sm leading-relaxed">
+                {renderMarkdown(analysisResult)}
               </div>
             )}
           </div>
