@@ -89,6 +89,12 @@ export default function HomePage() {
           const newText = result.text;
           return prev ? `${prev}\n\n${newText}` : newText;
         });
+        // 滚动到底部
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
+          }
+        }, 0);
       }
     } catch {
       alert('图片识别失败');
@@ -320,15 +326,15 @@ export default function HomePage() {
       <main className="flex-1 flex overflow-hidden">
         {/* Left: Input */}
         <div className="w-[380px] shrink-0 border-r border-neutral-100 flex flex-col">
-          <div className="p-4 flex-1 flex flex-col">
+          <div className="p-4 flex-1 flex flex-col min-h-0">
             {/* Input Area */}
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 min-h-0 flex flex-col">
               <Textarea
                 ref={textareaRef}
                 placeholder="粘贴开发说的话...&#10;&#10;支持 Ctrl+V 粘贴多张截图"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                className="flex-1 min-h-0 border-neutral-200 text-sm placeholder:text-neutral-400 focus:border-neutral-300 resize-none"
+                className="flex-1 min-h-0 border-neutral-200 text-sm placeholder:text-neutral-400 focus:border-neutral-300 resize-none overflow-y-auto"
                 disabled={isAnalyzing}
               />
             </div>
