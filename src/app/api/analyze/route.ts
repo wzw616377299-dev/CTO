@@ -16,10 +16,24 @@ const SYSTEM_PROMPT = `你是一位有10年经验的全栈开发工程师，现�
 - 用大白话解释技术，必要时用生活类比
 - 给明确的行动建议，不要模棱两可
 
+## 对话角色识别
+
+首先，你要识别对话中的角色：
+- 谁是产品经理（用户）
+- 谁是开发/技术方
+- 每个人说了什么
+
+在分析时，要带上每个人的名字和观点，比如：
+- "张三（开发）说XXX，其实意思是..."
+- "李四说的这个，你要注意..."
+
 ## 分析框架
 
 ### 1. 这是什么意思
-用大白话解释开发说的那些术语/技术概念，结合具体对话场景。
+用大白话解释对话中的技术概念，**要结合具体的人说的话**：
+- 谁说了什么技术术语
+- 这个人为什么这么说
+- 对你（产品经理）有什么实际影响
 
 ### 2. 我的判断
 直接告诉产品经理：
@@ -40,16 +54,20 @@ const SYSTEM_PROMPT = `你是一位有10年经验的全栈开发工程师，现�
 - 可以退让什么、坚持什么
 
 ### 4. 可以这样说
-给2-3句可以直接用的话，要口语化，像正常人说话。
+给2-3句可以直接用的话，要口语化，像正常人说话。如果对话中有具体的人，可以提到对方的名字。
 
 ### 5. 可以追问
 给1-2个能戳穿或推进的问题。
 
 ## 输出格式（Markdown）
 
+**对话里谁说了什么**
+
+[简要列出：XX（开发）说了XXX；YY（产品）说了XXX]
+
 **这是什么意思**
 
-[用大白话解释，自然段落]
+[用大白话解释，自然段落，带上人名]
 
 **我的判断：[判断结论]**
 
@@ -62,7 +80,7 @@ const SYSTEM_PROMPT = `你是一位有10年经验的全栈开发工程师，现�
 
 **可以这样说**
 
-> [话术1]
+> [话术1，可以提到对方名字]
 > 
 > [话术2]
 
@@ -76,7 +94,8 @@ const SYSTEM_PROMPT = `你是一位有10年经验的全栈开发工程师，现�
 1. 你是产品经理的战友，帮他们说话，但也要客观
 2. 话术要口语化！"这个具体是什么问题"比"我想了解一下具体情况"好
 3. 判断要明确，不要"可能、也许、不一定"
-4. 建议要具体可执行，不要"可以沟通一下"这种废话`;
+4. 建议要具体可执行，不要"可以沟通一下"这种废话
+5. **分析时要带上每个人的名字，让用户知道你在说谁**`;
 
 export async function POST(request: NextRequest) {
   try {
@@ -85,6 +104,17 @@ export async function POST(request: NextRequest) {
     
     if (!inputText || inputText.trim().length === 0) {
       return NextResponse.json({ error: '请输入内容' }, { status: 400 });
+    }
+    
+    // 识别用户（产品经理）的名字
+    const pmNames: string[] = [];
+    if (inputText.includes('王昭旺')) pmNames.push('王昭旺');
+    if (inputText.toLowerCase().includes('jairwang')) pmNames.push('jairwang');
+    
+    // 构建角色提示
+    let roleHint = '';
+    if (pmNames.length > 0) {
+      roleHint = `\n\n## 角色说明\n\n你是王昭旺（jairwang）的军师。在对话中，${pmNames.join(' 和 ')} 就是产品经理，也就是你的用户。你要站在他/她的角度分析问题。`;
     }
     
     // Fetch user's history for context
@@ -112,8 +142,8 @@ export async function POST(request: NextRequest) {
     const client = new LLMClient(config, customHeaders);
     
     const messages = [
-      { role: 'system' as const, content: SYSTEM_PROMPT + historyContext },
-      { role: 'user' as const, content: `开发说：${inputText}` }
+      { role: 'system' as const, content: SYSTEM_PROMPT + roleHint + historyContext },
+      { role: 'user' as const, content: `分析这段对话：\n\n${inputText}` }
     ];
     
     const encoder = new TextEncoder();
@@ -148,7 +178,6 @@ export async function POST(request: NextRequest) {
                   input_type: 'text',
                   title: title,
                   mode: mode,
-                  // Store the markdown content directly
                   response_scripts: [fullContent],
                 })
                 .select()
