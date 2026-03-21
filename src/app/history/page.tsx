@@ -3,23 +3,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
-  ArrowLeft, 
+  ChevronLeft, 
   Search, 
   Trash2, 
   Star, 
   StarOff, 
-  Tag, 
   Plus,
   X,
   Download,
   FileText,
-  Calendar,
-  ChevronLeft,
   ChevronRight,
-  Loader2
+  Loader2,
+  Sparkles
 } from 'lucide-react';
 import { recordsApi, tagsApi, getUserId } from '@/lib/api';
 import Link from 'next/link';
@@ -63,16 +60,16 @@ interface AnalysisRecordItem {
 }
 
 const INTENT_TYPE_MAP: Record<string, { label: string; color: string }> = {
-  normal: { label: '正常沟通', color: 'bg-green-100 text-green-800' },
-  discussion: { label: '技术讨论', color: 'bg-blue-100 text-blue-800' },
-  explanation: { label: '解释说明', color: 'bg-yellow-100 text-yellow-800' },
-  obstruction: { label: '设置障碍', color: 'bg-orange-100 text-orange-800' },
-  deflection: { label: '转移话题', color: 'bg-red-100 text-red-800' },
+  normal: { label: '正常沟通', color: 'bg-green-500/10 text-green-600 border-green-500/20' },
+  discussion: { label: '技术讨论', color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
+  explanation: { label: '解释说明', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20' },
+  obstruction: { label: '设置障碍', color: 'bg-orange-500/10 text-orange-600 border-orange-500/20' },
+  deflection: { label: '转移话题', color: 'bg-red-500/10 text-red-600 border-red-500/20' },
 };
 
 const TAG_COLORS = [
-  '#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316',
-  '#eab308', '#22c55e', '#14b8a6', '#0ea5e9', '#6b7280'
+  '#0071e3', '#5856d6', '#af52de', '#ff2d55', '#ff9500',
+  '#ffcc00', '#34c759', '#00c7be', '#30b0c7', '#8e8e93'
 ];
 
 export default function HistoryPage() {
@@ -90,7 +87,6 @@ export default function HistoryPage() {
   const [newTagName, setNewTagName] = useState('');
   const [newTagColor, setNewTagColor] = useState(TAG_COLORS[0]);
 
-  // Ensure user ID exists
   useEffect(() => {
     getUserId();
   }, []);
@@ -200,294 +196,292 @@ export default function HistoryPage() {
   const totalPages = Math.ceil(total / limit);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <div className="min-h-screen bg-[#f5f5f7]">
       {/* Header */}
-      <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <Link href="/">
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <ArrowLeft className="w-4 h-4" />
-                  返回
-                </Button>
-              </Link>
-              <div className="h-6 w-px bg-gray-200" />
-              <h1 className="text-lg font-bold text-gray-900">历史记录</h1>
-            </div>
-            <Button variant="outline" onClick={handleExport} className="gap-2">
-              <Download className="w-4 h-4" />
-              导出
-            </Button>
+      <header className="sticky top-0 z-40 glass border-b border-black/5">
+        <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-2 text-gray-500 hover:text-gray-700 transition-colors">
+              <ChevronLeft className="w-5 h-5" />
+              <span>返回</span>
+            </Link>
+            <div className="h-4 w-px bg-gray-200" />
+            <span className="font-semibold text-[17px]">历史记录</span>
           </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleExport} 
+            className="gap-2 text-[#0071e3] hover:text-[#0071e3] hover:bg-[#0071e3]/5"
+          >
+            <Download className="w-4 h-4" />
+            导出
+          </Button>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left: Filter & List */}
-          <div className="lg:col-span-1 space-y-4">
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input
-                placeholder="搜索记录..."
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
-                className="pl-10"
-              />
-            </div>
-            
-            {/* Filters */}
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant={favoriteOnly ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => {
-                  setFavoriteOnly(!favoriteOnly);
-                  setPage(1);
-                }}
-                className="gap-2"
-              >
-                <Star className="w-4 h-4" />
-                收藏
-              </Button>
-              
-              {tags.map((tag) => (
-                <Badge
-                  key={tag.id}
-                  variant={selectedTag === tag.id ? 'default' : 'outline'}
-                  className="cursor-pointer"
-                  style={{ 
-                    backgroundColor: selectedTag === tag.id ? tag.color : 'transparent',
-                    borderColor: tag.color,
-                    color: selectedTag === tag.id ? 'white' : tag.color,
-                  }}
-                  onClick={() => {
-                    setSelectedTag(selectedTag === tag.id ? '' : tag.id);
-                    setPage(1);
-                  }}
-                >
-                  {tag.name}
-                </Badge>
-              ))}
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowTagModal(true)}
-                className="gap-1 text-gray-500"
-              >
-                <Plus className="w-3 h-3" />
-                新标签
-              </Button>
-            </div>
-            
-            {/* Record List */}
-            <div className="space-y-3">
-              {loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
-                </div>
-              ) : records.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
-                  <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                  <p>暂无记录</p>
-                </div>
-              ) : (
-                records.map((record) => (
-                  <Card
-                    key={record.id}
-                    className={`cursor-pointer transition-all hover:shadow-md ${
-                      selectedRecord?.id === record.id ? 'ring-2 ring-indigo-500' : ''
-                    }`}
-                    onClick={() => setSelectedRecord(record)}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-gray-900 truncate">
-                            {record.title || record.input_text.slice(0, 50)}
-                          </p>
-                          <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
-                            <Calendar className="w-3 h-3" />
-                            {new Date(record.created_at).toLocaleDateString('zh-CN')}
-                            {record.intent_analysis && (
-                              <Badge className={INTENT_TYPE_MAP[record.intent_analysis.type]?.color}>
-                                {INTENT_TYPE_MAP[record.intent_analysis.type]?.label}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleFavorite(record);
-                            }}
-                          >
-                            {record.is_favorite ? (
-                              <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                            ) : (
-                              <StarOff className="w-4 h-4 text-gray-400" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(record.id);
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-500" />
-                          </Button>
-                        </div>
-                      </div>
-                      {record.tags && record.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {record.tags.map((tag) => (
-                            <Badge
-                              key={tag.id}
-                              variant="outline"
-                              className="text-xs"
-                              style={{ borderColor: tag.color, color: tag.color }}
-                            >
-                              {tag.name}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))
-              )}
-              
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-2 pt-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page === 1}
-                    onClick={() => setPage(page - 1)}
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </Button>
-                  <span className="text-sm text-gray-600">
-                    {page} / {totalPages}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page === totalPages}
-                    onClick={() => setPage(page + 1)}
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
-                </div>
-              )}
-            </div>
+      <main className="max-w-5xl mx-auto px-6 py-8">
+        {/* Search & Filters */}
+        <div className="mb-6">
+          <div className="relative mb-4">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              placeholder="搜索记录..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="pl-11 h-11 bg-white border-black/5 rounded-xl"
+            />
           </div>
           
-          {/* Right: Record Detail */}
-          <div className="lg:col-span-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => {
+                setFavoriteOnly(!favoriteOnly);
+                setPage(1);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                favoriteOnly 
+                  ? 'bg-[#ffcc00]/10 text-[#ff9500] border border-[#ffcc00]/30' 
+                  : 'bg-white text-gray-500 border border-black/5 hover:border-black/10'
+              }`}
+            >
+              <Star className={`w-3.5 h-3.5 ${favoriteOnly ? 'fill-[#ffcc00]' : ''}`} />
+              收藏
+            </button>
+            
+            {tags.map((tag) => (
+              <button
+                key={tag.id}
+                onClick={() => {
+                  setSelectedTag(selectedTag === tag.id ? '' : tag.id);
+                  setPage(1);
+                }}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                  selectedTag === tag.id 
+                    ? 'text-white' 
+                    : 'bg-white text-gray-600 border border-black/5 hover:border-black/10'
+                }`}
+                style={selectedTag === tag.id ? { backgroundColor: tag.color } : {}}
+              >
+                {tag.name}
+              </button>
+            ))}
+            
+            <button
+              onClick={() => setShowTagModal(true)}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm text-gray-400 hover:text-gray-600 bg-white border border-black/5 hover:border-black/10 transition-all"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              新标签
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          {/* Record List */}
+          <div className="lg:col-span-2 space-y-3">
+            {loading ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="w-6 h-6 animate-spin text-[#0071e3]" />
+              </div>
+            ) : records.length === 0 ? (
+              <div className="text-center py-20">
+                <div className="w-16 h-16 rounded-full bg-[#f5f5f7] flex items-center justify-center mx-auto mb-4">
+                  <FileText className="w-8 h-8 text-gray-300" />
+                </div>
+                <p className="text-gray-500">暂无记录</p>
+              </div>
+            ) : (
+              records.map((record) => (
+                <div
+                  key={record.id}
+                  onClick={() => setSelectedRecord(record)}
+                  className={`bg-white rounded-xl p-4 cursor-pointer transition-all border ${
+                    selectedRecord?.id === record.id 
+                      ? 'border-[#0071e3]/30 shadow-sm' 
+                      : 'border-black/5 hover:border-black/10'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 truncate">
+                        {record.title || record.input_text.slice(0, 40)}
+                      </p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        {new Date(record.created_at).toLocaleDateString('zh-CN', { 
+                          month: 'short', 
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleFavorite(record);
+                        }}
+                        className="p-1.5 rounded-lg hover:bg-black/5 transition-colors"
+                      >
+                        {record.is_favorite ? (
+                          <Star className="w-4 h-4 text-[#ffcc00] fill-[#ffcc00]" />
+                        ) : (
+                          <StarOff className="w-4 h-4 text-gray-300" />
+                        )}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(record.id);
+                        }}
+                        className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {record.intent_analysis && (
+                    <div className="mt-2">
+                      <Badge className={INTENT_TYPE_MAP[record.intent_analysis.type]?.color}>
+                        {INTENT_TYPE_MAP[record.intent_analysis.type]?.label}
+                      </Badge>
+                    </div>
+                  )}
+                  
+                  {record.tags && record.tags.length > 0 && (
+                    <div className="flex gap-1.5 mt-2">
+                      {record.tags.map((tag) => (
+                        <span
+                          key={tag.id}
+                          className="px-2 py-0.5 rounded text-xs text-white"
+                          style={{ backgroundColor: tag.color }}
+                        >
+                          {tag.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+            
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 pt-4">
+                <button
+                  disabled={page === 1}
+                  onClick={() => setPage(page - 1)}
+                  className="p-2 rounded-lg hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-sm text-gray-500">
+                  {page} / {totalPages}
+                </span>
+                <button
+                  disabled={page === totalPages}
+                  onClick={() => setPage(page + 1)}
+                  className="p-2 rounded-lg hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+          
+          {/* Record Detail */}
+          <div className="lg:col-span-3">
             {selectedRecord ? (
               <div className="space-y-4">
                 {/* Header */}
-                <Card className="border-0 shadow-lg">
-                  <CardHeader>
-                    <CardTitle className="text-lg">{selectedRecord.title}</CardTitle>
-                    <p className="text-sm text-gray-500">
-                      {new Date(selectedRecord.created_at).toLocaleString('zh-CN')}
+                <div className="bg-white rounded-xl p-5 border border-black/5">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-2">
+                    {selectedRecord.title}
+                  </h2>
+                  <p className="text-sm text-gray-500 mb-4">
+                    {new Date(selectedRecord.created_at).toLocaleString('zh-CN')}
+                  </p>
+                  <div className="bg-[#f5f5f7] rounded-xl p-4">
+                    <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
+                      {selectedRecord.input_text}
                     </p>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="p-4 bg-gray-50 rounded-lg">
-                      <p className="text-gray-700 whitespace-pre-wrap">{selectedRecord.input_text}</p>
-                    </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
                 
-                {/* Technical Points */}
+                {/* Analysis Results */}
                 {selectedRecord.technical_points && selectedRecord.technical_points.length > 0 && (
-                  <Card className="border-0 shadow-lg">
-                    <CardHeader>
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Tag className="w-5 h-5 text-blue-500" />
-                        技术点拆解
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
+                  <div className="bg-white rounded-xl p-5 border border-black/5">
+                    <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
+                      <span>📚</span> 技术点拆解
+                    </h3>
+                    <div className="space-y-3">
                       {selectedRecord.technical_points.map((point, index) => (
-                        <div key={index} className="p-3 bg-blue-50 rounded-lg">
-                          <Badge className="bg-blue-100 text-blue-800 mb-2">{point.term}</Badge>
-                          <p className="text-sm text-gray-700">{point.explanation}</p>
+                        <div key={index} className="bg-[#f5f5f7] rounded-xl p-4">
+                          <div className="font-medium text-gray-900">{point.term}</div>
+                          <p className="text-[15px] text-gray-600 mt-1">{point.explanation}</p>
                         </div>
                       ))}
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
                 )}
                 
-                {/* Intent Analysis */}
                 {selectedRecord.intent_analysis && (
-                  <Card className="border-0 shadow-lg">
-                    <CardHeader>
-                      <CardTitle className="text-base">意图分析</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="p-4 bg-amber-50 rounded-lg">
-                        <Badge className={INTENT_TYPE_MAP[selectedRecord.intent_analysis.type]?.color}>
-                          {INTENT_TYPE_MAP[selectedRecord.intent_analysis.type]?.label}
-                        </Badge>
-                        <p className="mt-2 text-gray-700">{selectedRecord.intent_analysis.summary}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <div className="bg-white rounded-xl p-5 border border-black/5">
+                    <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
+                      <span>🎯</span> 意图分析
+                    </h3>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Badge className={INTENT_TYPE_MAP[selectedRecord.intent_analysis.type]?.color}>
+                        {INTENT_TYPE_MAP[selectedRecord.intent_analysis.type]?.label}
+                      </Badge>
+                    </div>
+                    <p className="text-gray-700">{selectedRecord.intent_analysis.summary}</p>
+                  </div>
                 )}
                 
-                {/* Response Scripts */}
                 {selectedRecord.response_scripts && selectedRecord.response_scripts.length > 0 && (
-                  <Card className="border-0 shadow-lg">
-                    <CardHeader>
-                      <CardTitle className="text-base">应对话术</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
+                  <div className="bg-white rounded-xl p-5 border border-black/5">
+                    <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
+                      <span>💬</span> 应对话术
+                    </h3>
+                    <div className="space-y-2">
                       {selectedRecord.response_scripts.map((script, index) => (
-                        <div key={index} className="p-3 bg-green-50 rounded-lg text-gray-700">
+                        <div key={index} className="bg-[#f5f5f7] rounded-xl p-4 text-gray-700">
                           {script}
                         </div>
                       ))}
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
                 )}
                 
-                {/* Follow-up Questions */}
                 {selectedRecord.follow_up_questions && selectedRecord.follow_up_questions.length > 0 && (
-                  <Card className="border-0 shadow-lg">
-                    <CardHeader>
-                      <CardTitle className="text-base">追问方向</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
+                  <div className="bg-white rounded-xl p-5 border border-black/5">
+                    <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
+                      <span>❓</span> 追问方向
+                    </h3>
+                    <div className="space-y-2">
                       {selectedRecord.follow_up_questions.map((question, index) => (
-                        <div key={index} className="p-3 bg-purple-50 rounded-lg text-gray-700">
+                        <div key={index} className="bg-[#f5f5f7] rounded-xl p-4 text-gray-700">
                           {question}
                         </div>
                       ))}
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
                 )}
               </div>
             ) : (
-              <div className="h-full flex items-center justify-center">
-                <div className="text-center text-gray-500">
-                  <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                  <p>选择一条记录查看详情</p>
+              <div className="h-[400px] flex items-center justify-center">
+                <div className="text-center">
+                  <div className="w-16 h-16 rounded-full bg-[#f5f5f7] flex items-center justify-center mx-auto mb-4">
+                    <FileText className="w-8 h-8 text-gray-300" />
+                  </div>
+                  <p className="text-gray-500">选择一条记录查看详情</p>
                 </div>
               </div>
             )}
@@ -497,37 +491,44 @@ export default function HistoryPage() {
       
       {/* New Tag Modal */}
       {showTagModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-80">
-            <CardHeader>
-              <CardTitle className="text-base flex items-center justify-between">
-                创建标签
-                <Button variant="ghost" size="sm" onClick={() => setShowTagModal(false)}>
-                  <X className="w-4 h-4" />
-                </Button>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-80 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-black/5">
+              <span className="font-semibold">新建标签</span>
+              <button
+                onClick={() => setShowTagModal(false)}
+                className="p-1 rounded-lg hover:bg-black/5 transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
               <Input
                 placeholder="标签名称"
                 value={newTagName}
                 onChange={(e) => setNewTagName(e.target.value)}
+                className="h-11"
               />
               <div className="flex flex-wrap gap-2">
                 {TAG_COLORS.map((color) => (
                   <button
                     key={color}
-                    className={`w-6 h-6 rounded-full ${newTagColor === color ? 'ring-2 ring-offset-2' : ''}`}
-                    style={{ backgroundColor: color, ['--tw-ring-color' as string]: color }}
                     onClick={() => setNewTagColor(color)}
+                    className={`w-7 h-7 rounded-full transition-transform ${
+                      newTagColor === color ? 'scale-110 ring-2 ring-offset-2' : ''
+                    }`}
+                    style={{ backgroundColor: color, ['--tw-ring-color' as string]: color }}
                   />
                 ))}
               </div>
-              <Button className="w-full" onClick={handleCreateTag}>
+              <Button 
+                className="w-full h-11 bg-[#0071e3] hover:bg-[#0077ed]" 
+                onClick={handleCreateTag}
+              >
                 创建
               </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       )}
     </div>
