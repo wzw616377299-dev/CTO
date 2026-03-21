@@ -16,9 +16,7 @@ import {
   Copy,
   Check,
   Loader2,
-  Sparkles,
-  X,
-  Paperclip
+  X
 } from 'lucide-react';
 import { analyzeApi, uploadApi, getUserId } from '@/lib/api';
 import Link from 'next/link';
@@ -45,15 +43,20 @@ interface AnalysisResult {
     summary: string;
     details: string[];
   };
+  relatedHistory?: {
+    id: string;
+    title: string;
+    similarity: string;
+  }[];
   recordId?: string;
 }
 
-const INTENT_TYPE_MAP: Record<string, { label: string; color: string }> = {
-  normal: { label: '正常沟通', color: 'bg-green-500/10 text-green-600 border-green-500/20' },
-  discussion: { label: '技术讨论', color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
-  explanation: { label: '解释说明', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20' },
-  obstruction: { label: '可能设置障碍', color: 'bg-orange-500/10 text-orange-600 border-orange-500/20' },
-  deflection: { label: '可能转移话题', color: 'bg-red-500/10 text-red-600 border-red-500/20' },
+const INTENT_TYPE_MAP: Record<string, { label: string }> = {
+  normal: { label: '正常沟通' },
+  discussion: { label: '技术讨论' },
+  explanation: { label: '解释说明' },
+  obstruction: { label: '可能设置障碍' },
+  deflection: { label: '可能转移话题' },
 };
 
 export default function HomePage() {
@@ -70,9 +73,9 @@ export default function HomePage() {
     scripts: true,
     questions: true,
     knowledge: false,
+    history: true,
   });
   const [isDragging, setIsDragging] = useState(false);
-  const [pendingImage, setPendingImage] = useState<string | null>(null);
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -141,24 +144,15 @@ export default function HomePage() {
   }, []);
 
   const processImageFile = async (file: File) => {
-    // Show preview
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setPendingImage(e.target?.result as string);
-    };
-    reader.readAsDataURL(file);
-
-    // Upload and OCR
     try {
       setIsAnalyzing(true);
       const result = await uploadApi.image(file);
       if (result.text) {
         setInputText(result.text);
-        setPendingImage(null);
       }
     } catch (error) {
       console.error('Upload error:', error);
-      alert('图片识别失败，请重试');
+      alert('图片识别失败');
     } finally {
       setIsAnalyzing(false);
     }
@@ -219,7 +213,7 @@ export default function HomePage() {
       }
     } catch (error) {
       console.error('Analysis error:', error);
-      alert('分析失败，请重试');
+      alert('分析失败');
     } finally {
       setIsAnalyzing(false);
     }
@@ -248,7 +242,7 @@ export default function HomePage() {
           }
         } catch (error) {
           console.error('Transcribe error:', error);
-          alert('语音识别失败，请重试');
+          alert('语音识别失败');
         } finally {
           setIsAnalyzing(false);
         }
@@ -260,7 +254,7 @@ export default function HomePage() {
       setIsRecording(true);
     } catch (error) {
       console.error('Recording error:', error);
-      alert('无法访问麦克风，请检查权限');
+      alert('无法访问麦克风');
     }
   };
 
@@ -282,75 +276,47 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7]">
+    <div className="min-h-screen bg-white">
       {/* Drag overlay */}
       {isDragging && (
-        <div className="fixed inset-0 bg-white/80 backdrop-blur-xl z-50 flex items-center justify-center">
+        <div className="fixed inset-0 bg-white/95 z-50 flex items-center justify-center border-2 border-dashed border-neutral-300 m-4">
           <div className="text-center">
-            <div className="w-20 h-20 rounded-2xl bg-[#0071e3]/10 flex items-center justify-center mx-auto mb-4">
-              <Image className="w-10 h-10 text-[#0071e3]" />
-            </div>
-            <p className="text-xl font-medium text-gray-900">释放以上传图片</p>
+            <Image className="w-12 h-12 text-neutral-400 mx-auto mb-3" />
+            <p className="text-neutral-600">释放以上传图片</p>
           </div>
         </div>
       )}
 
       {/* Header */}
-      <header className="sticky top-0 z-40 glass border-b border-black/5">
-        <div className="max-w-4xl mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0071e3] to-[#5856d6] flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-semibold text-[17px]">PM 助手</span>
-          </div>
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-neutral-100">
+        <div className="max-w-3xl mx-auto px-6 h-12 flex items-center justify-between">
+          <span className="font-medium text-neutral-900">PM 助手</span>
           <Link href="/history">
-            <Button variant="ghost" size="sm" className="gap-2 text-[#0071e3] hover:text-[#0071e3] hover:bg-[#0071e3]/5">
+            <Button variant="ghost" size="sm" className="gap-2 text-neutral-500 hover:text-neutral-900">
               <Clock className="w-4 h-4" />
-              历史记录
+              历史
             </Button>
           </Link>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-6 py-12">
-        {/* Title */}
-        <div className="text-center mb-10">
-          <h1 className="text-[32px] font-semibold text-gray-900 tracking-tight mb-3">
-            技术沟通，不再困难
-          </h1>
-          <p className="text-[17px] text-gray-500">
-            输入开发说的话，AI 帮你拆解技术点、分析意图、给出应对话术
-          </p>
-        </div>
-
+      <main className="max-w-3xl mx-auto px-6 py-8">
         {/* Input Area */}
-        <div className="bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden mb-6">
-          {/* Pending image preview */}
-          {pendingImage && (
-            <div className="relative p-4 border-b border-black/5">
-              <img src={pendingImage} alt="Preview" className="max-h-40 rounded-xl mx-auto" />
-              <div className="absolute inset-0 flex items-center justify-center bg-white/50">
-                <Loader2 className="w-8 h-8 animate-spin text-[#0071e3]" />
-              </div>
-            </div>
-          )}
-          
-          {/* Textarea */}
+        <div className="mb-8">
           <div className="relative">
             <Textarea
               ref={textareaRef}
-              placeholder="粘贴或输入开发说的话...&#10;&#10;支持直接粘贴截图"
+              placeholder="输入或粘贴开发说的话...&#10;&#10;支持 Ctrl+V 直接粘贴截图"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              className="min-h-[160px] border-0 rounded-none text-[17px] placeholder:text-gray-400 focus-visible:ring-0 resize-none p-5"
+              className="min-h-[120px] border-neutral-200 rounded-lg text-base placeholder:text-neutral-400 focus:border-neutral-400 resize-none"
               disabled={isAnalyzing}
             />
           </div>
           
           {/* Toolbar */}
-          <div className="flex items-center justify-between px-4 py-3 border-t border-black/5 bg-[#fafafa]/80">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between mt-3">
+            <div className="flex items-center gap-1">
               {/* File upload */}
               <label className="cursor-pointer">
                 <input
@@ -363,8 +329,8 @@ export default function HomePage() {
                     e.target.value = '';
                   }}
                 />
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-black/5 transition-colors text-sm">
-                  <Paperclip className="w-4 h-4" />
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm text-neutral-500 hover:text-neutral-900 hover:bg-neutral-50 transition-colors">
+                  <Image className="w-4 h-4" />
                   <span>图片</span>
                 </div>
               </label>
@@ -373,10 +339,10 @@ export default function HomePage() {
               <button
                 onClick={isRecording ? stopRecording : startRecording}
                 disabled={isAnalyzing}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-colors ${
                   isRecording 
-                    ? 'text-red-500 bg-red-50' 
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-black/5'
+                    ? 'text-red-600 bg-red-50' 
+                    : 'text-neutral-500 hover:text-neutral-900 hover:bg-neutral-50'
                 }`}
               >
                 {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
@@ -384,10 +350,10 @@ export default function HomePage() {
               </button>
             </div>
             
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               {/* Mode toggle */}
               <label className="flex items-center gap-2 cursor-pointer">
-                <span className="text-sm text-gray-500">详细模式</span>
+                <span className="text-sm text-neutral-500">详细</span>
                 <Switch
                   checked={mode === 'detailed'}
                   onCheckedChange={(checked) => setMode(checked ? 'detailed' : 'concise')}
@@ -398,13 +364,13 @@ export default function HomePage() {
               <Button
                 onClick={handleAnalyze}
                 disabled={!inputText.trim() || isAnalyzing}
-                className="bg-[#0071e3] hover:bg-[#0077ed] text-white rounded-full px-5 h-9"
+                className="bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg h-9 px-4"
               >
                 {isAnalyzing ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <>
-                    <ArrowUp className="w-4 h-4 mr-1" />
+                    <ArrowUp className="w-4 h-4 mr-1.5" />
                     分析
                   </>
                 )}
@@ -413,143 +379,152 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Privacy hint */}
-        <p className="text-center text-sm text-gray-400 mb-12">
-          图片和语音仅用于识别，识别后立即删除
-        </p>
-
-        {/* Analysis Result */}
+        {/* Streaming content */}
         {isAnalyzing && !analysisResult && streamingContent && (
-          <div className="bg-white rounded-2xl shadow-sm border border-black/5 p-6 mb-6">
-            <div className="flex items-center gap-2 text-[#0071e3] mb-4">
+          <div className="bg-neutral-50 rounded-lg p-4 mb-6">
+            <div className="flex items-center gap-2 text-neutral-600 mb-3">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="font-medium">正在分析...</span>
+              <span className="text-sm">分析中...</span>
             </div>
-            <div className="text-gray-600 whitespace-pre-wrap text-[15px] leading-relaxed">
+            <div className="text-neutral-600 whitespace-pre-wrap text-sm leading-relaxed">
               {streamingContent}
             </div>
           </div>
         )}
 
+        {/* Analysis Result */}
         {analysisResult && (
           <div className="space-y-4">
+            {/* Related History */}
+            {analysisResult.relatedHistory && analysisResult.relatedHistory.length > 0 && (
+              <ResultSection
+                title="相关历史"
+                expanded={expandedSections.history}
+                onToggle={() => toggleSection('history')}
+              >
+                <div className="space-y-2">
+                  {analysisResult.relatedHistory.map((item, index) => (
+                    <div key={index} className="flex items-center justify-between py-2 border-b border-neutral-100 last:border-0">
+                      <span className="text-sm text-neutral-700">{item.title}</span>
+                      <span className="text-xs text-neutral-400">{item.similarity}</span>
+                    </div>
+                  ))}
+                </div>
+              </ResultSection>
+            )}
+            
             {/* Technical Points */}
             {analysisResult.technicalPoints && analysisResult.technicalPoints.length > 0 && (
-              <ResultCard
-                title="技术点拆解"
-                icon="📚"
+              <ResultSection
+                title="技术点"
                 expanded={expandedSections.technical}
                 onToggle={() => toggleSection('technical')}
               >
                 <div className="space-y-4">
                   {analysisResult.technicalPoints.map((point, index) => (
-                    <div key={index} className="bg-[#f5f5f7] rounded-xl p-4">
-                      <div className="font-medium text-gray-900 mb-2">{point.term}</div>
-                      <p className="text-[15px] text-gray-600 leading-relaxed">{point.explanation}</p>
-                      <div className="mt-3 pt-3 border-t border-black/5 text-sm text-gray-500 space-y-1">
-                        <p><span className="font-medium text-gray-700">为什么提到：</span>{point.whyMentioned}</p>
-                        <p><span className="font-medium text-gray-700">实际影响：</span>{point.impact}</p>
+                    <div key={index} className="border-l-2 border-neutral-200 pl-4">
+                      <div className="font-medium text-neutral-900 mb-1">{point.term}</div>
+                      <p className="text-sm text-neutral-600 leading-relaxed">{point.explanation}</p>
+                      <div className="mt-2 text-xs text-neutral-500 space-y-0.5">
+                        <p>提到原因：{point.whyMentioned}</p>
+                        <p>实际影响：{point.impact}</p>
                       </div>
                     </div>
                   ))}
                 </div>
-              </ResultCard>
+              </ResultSection>
             )}
             
             {/* Intent Analysis */}
             {analysisResult.intentAnalysis && (
-              <ResultCard
-                title="意图分析"
-                icon="🎯"
+              <ResultSection
+                title="意图"
                 expanded={expandedSections.intent}
                 onToggle={() => toggleSection('intent')}
               >
-                <div className="flex items-start gap-3">
-                  <Badge className={INTENT_TYPE_MAP[analysisResult.intentAnalysis.type]?.color}>
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant="outline" className="border-neutral-300 text-neutral-700">
                     {INTENT_TYPE_MAP[analysisResult.intentAnalysis.type]?.label}
                   </Badge>
                 </div>
-                <p className="text-[15px] text-gray-700 mt-3 leading-relaxed">{analysisResult.intentAnalysis.summary}</p>
-                <p className="text-sm text-gray-500 mt-2">{analysisResult.intentAnalysis.reasoning}</p>
-              </ResultCard>
+                <p className="text-sm text-neutral-700 leading-relaxed">{analysisResult.intentAnalysis.summary}</p>
+                <p className="text-xs text-neutral-500 mt-2">{analysisResult.intentAnalysis.reasoning}</p>
+              </ResultSection>
             )}
             
             {/* Response Scripts */}
             {analysisResult.responseScripts && analysisResult.responseScripts.length > 0 && (
-              <ResultCard
-                title="应对话术"
-                icon="💬"
+              <ResultSection
+                title="话术"
                 expanded={expandedSections.scripts}
                 onToggle={() => toggleSection('scripts')}
               >
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {analysisResult.responseScripts.map((script, index) => (
-                    <div key={index} className="group relative bg-[#f5f5f7] rounded-xl p-4 pr-12">
-                      <p className="text-[15px] text-gray-700 leading-relaxed">{script}</p>
+                    <div key={index} className="group relative bg-neutral-50 rounded p-3 pr-10">
+                      <p className="text-sm text-neutral-700 leading-relaxed">{script}</p>
                       <button
                         onClick={() => copyToClipboard(script, index)}
-                        className="absolute top-3 right-3 p-2 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-black/5 transition-all"
+                        className="absolute top-2 right-2 p-1.5 rounded opacity-0 group-hover:opacity-100 hover:bg-neutral-200 transition-all"
                       >
                         {copiedIndex === index ? (
-                          <Check className="w-4 h-4 text-green-500" />
+                          <Check className="w-3.5 h-3.5 text-neutral-600" />
                         ) : (
-                          <Copy className="w-4 h-4 text-gray-400" />
+                          <Copy className="w-3.5 h-3.5 text-neutral-400" />
                         )}
                       </button>
                     </div>
                   ))}
                 </div>
-              </ResultCard>
+              </ResultSection>
             )}
             
             {/* Follow-up Questions */}
             {analysisResult.followUpQuestions && analysisResult.followUpQuestions.length > 0 && (
-              <ResultCard
-                title="追问方向"
-                icon="❓"
+              <ResultSection
+                title="追问"
                 expanded={expandedSections.questions}
                 onToggle={() => toggleSection('questions')}
               >
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {analysisResult.followUpQuestions.map((question, index) => (
-                    <div key={index} className="group relative bg-[#f5f5f7] rounded-xl p-4 pr-12">
-                      <p className="text-[15px] text-gray-700 leading-relaxed">{question}</p>
+                    <div key={index} className="group relative bg-neutral-50 rounded p-3 pr-10">
+                      <p className="text-sm text-neutral-700 leading-relaxed">{question}</p>
                       <button
                         onClick={() => copyToClipboard(question, index + 100)}
-                        className="absolute top-3 right-3 p-2 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-black/5 transition-all"
+                        className="absolute top-2 right-2 p-1.5 rounded opacity-0 group-hover:opacity-100 hover:bg-neutral-200 transition-all"
                       >
                         {copiedIndex === index + 100 ? (
-                          <Check className="w-4 h-4 text-green-500" />
+                          <Check className="w-3.5 h-3.5 text-neutral-600" />
                         ) : (
-                          <Copy className="w-4 h-4 text-gray-400" />
+                          <Copy className="w-3.5 h-3.5 text-neutral-400" />
                         )}
                       </button>
                     </div>
                   ))}
                 </div>
-              </ResultCard>
+              </ResultSection>
             )}
             
             {/* Knowledge Extension */}
             {analysisResult.knowledgeExtension && (
-              <ResultCard
-                title="知识扩展"
-                icon="📖"
+              <ResultSection
+                title="延伸"
                 expanded={expandedSections.knowledge}
                 onToggle={() => toggleSection('knowledge')}
               >
-                <p className="text-[15px] text-gray-700 leading-relaxed">{analysisResult.knowledgeExtension.summary}</p>
+                <p className="text-sm text-neutral-700 leading-relaxed">{analysisResult.knowledgeExtension.summary}</p>
                 {analysisResult.knowledgeExtension.details && (
-                  <ul className="mt-4 space-y-2">
+                  <ul className="mt-3 space-y-1.5">
                     {analysisResult.knowledgeExtension.details.map((detail, index) => (
-                      <li key={index} className="flex gap-3 text-[15px] text-gray-600">
-                        <span className="text-[#0071e3] mt-0.5">•</span>
+                      <li key={index} className="flex gap-2 text-sm text-neutral-600">
+                        <span className="text-neutral-400">•</span>
                         <span>{detail}</span>
                       </li>
                     ))}
                   </ul>
                 )}
-              </ResultCard>
+              </ResultSection>
             )}
           </div>
         )}
@@ -558,40 +533,33 @@ export default function HomePage() {
   );
 }
 
-// Result Card Component
-function ResultCard({ 
+// Result Section Component
+function ResultSection({ 
   title, 
-  icon, 
   expanded, 
   onToggle, 
   children 
 }: { 
   title: string; 
-  icon: string; 
   expanded: boolean; 
   onToggle: () => void;
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden">
+    <div className="border border-neutral-200 rounded-lg overflow-hidden">
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-black/[0.02] transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-neutral-50 transition-colors"
       >
-        <div className="flex items-center gap-2.5">
-          <span className="text-lg">{icon}</span>
-          <span className="font-medium text-gray-900">{title}</span>
-        </div>
-        <div className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/5">
-          {expanded ? (
-            <ChevronUp className="w-4 h-4 text-gray-500" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-gray-500" />
-          )}
-        </div>
+        <span className="font-medium text-neutral-900 text-sm">{title}</span>
+        {expanded ? (
+          <ChevronUp className="w-4 h-4 text-neutral-400" />
+        ) : (
+          <ChevronDown className="w-4 h-4 text-neutral-400" />
+        )}
       </button>
       {expanded && (
-        <div className="px-5 pb-5">
+        <div className="px-4 pb-4 border-t border-neutral-100 pt-3">
           {children}
         </div>
       )}

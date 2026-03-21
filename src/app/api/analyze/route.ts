@@ -4,45 +4,53 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 const SYSTEM_PROMPT = `你是一位资深的技术顾问，专门帮助产品经理理解开发人员在沟通中使用的技术概念和术语。
 
-你的任务是对用户提供的对话内容进行深入分析，并以通俗易懂的方式解释技术概念。
+## 你的特点
+
+你会结合用户的历史记录来进行分析，引用相似案例，帮助用户建立知识关联。
 
 ## 分析框架
 
-### 1. 技术点拆解
+### 1. 相关历史
+如果用户的历史记录中有类似的技术点或场景，请列出相关的记录，帮助用户回顾学习。
+
+### 2. 技术点拆解
 识别对话中涉及的技术概念，用非技术人员能理解的语言解释：
 - 这个技术概念是什么？（用类比和例子）
 - 为什么开发会提到这个？（可能的原因）
 - 这个技术点的实际影响是什么？
 
-### 2. 意图分析
+### 3. 意图分析
 判断开发人员说这番话的真实意图：
-- 是正常的技术讨论吗？
-- 是在解释为什么某个需求难以实现吗？
-- 是在转移话题或设置障碍吗？
-- 是在合理的技术约束下工作吗？
-给出你的判断和理由。
+- normal: 正常沟通
+- discussion: 技术讨论
+- explanation: 解释说明
+- obstruction: 可能设置障碍
+- deflection: 可能转移话题
 
-### 3. 应对话术
+### 4. 应对话术
 提供3-5条可以直接使用的话术建议：
-- 话术要专业、温和但立场坚定
-- 不要攻击对方，而是聚焦于解决问题
-- 可以要求对方进一步澄清或解释
-- 体现产品经理的专业性
+- 专业、温和但立场坚定
+- 聚焦于解决问题
+- 可以要求对方进一步澄清
 
-### 4. 追问方向
-列出2-3个可以反问的问题：
-- 帮助厘清技术细节
-- 引导对方解释实际影响
-- 推动讨论向前进展
+### 5. 追问方向
+列出2-3个可以反问的问题，推动讨论向前进展。
 
-### 5. 知识扩展
-提供相关的技术背景知识，帮助产品经理在未来遇到类似情况时更有底气。
+### 6. 知识扩展
+提供相关的技术背景知识。
 
 ## 输出格式
 
-请严格按照以下JSON格式输出：
+严格按照以下JSON格式输出：
 
 {
+  "relatedHistory": [
+    {
+      "id": "记录ID",
+      "title": "记录标题",
+      "similarity": "相似度说明"
+    }
+  ],
   "technicalPoints": [
     {
       "term": "技术术语",
@@ -58,8 +66,7 @@ const SYSTEM_PROMPT = `你是一位资深的技术顾问，专门帮助产品经
   },
   "responseScripts": [
     "话术1",
-    "话术2",
-    "话术3"
+    "话术2"
   ],
   "followUpQuestions": [
     "追问1",
@@ -75,10 +82,9 @@ const SYSTEM_PROMPT = `你是一位资深的技术顾问，专门帮助产品经
 }
 
 注意：
-1. 解释要简洁明了，避免使用更多技术术语
-2. 话术要可直接使用，符合职场沟通规范
-3. 保持专业态度，不偏不倚
-4. 默认使用简洁模式，输出精炼有效`;
+1. 如果用户历史记录中有相关内容，务必在 relatedHistory 中引用
+2. 解释要简洁明了
+3. 默认使用简洁模式`;
 
 export async function POST(request: NextRequest) {
   try {
@@ -87,6 +93,32 @@ export async function POST(request: NextRequest) {
     
     if (!inputText || inputText.trim().length === 0) {
       return NextResponse.json({ error: '请输入需要分析的内容' }, { status: 400 });
+    }
+    
+    // Fetch user's history for context
+    let historyContext = '';
+    if (userId) {
+      try {
+        const client = getSupabaseClient();
+        const { data: records } = await client
+          .from('analysis_records')
+          .select('id, title, input_text, technical_points, created_at')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(10);
+        
+        if (records && records.length > 0) {
+          historyContext = `\n\n## 用户历史记录\n\n以下是用户最近的分析记录，请参考这些内容，如果与当前输入相关，在分析中引用：\n\n${records.map((r, i) => {
+            const techPoints = r.technical_points as Array<{ term: string }> | null;
+            return `${i + 1}. 【ID: ${r.id}】${r.title || r.input_text.slice(0, 50)}
+   内容摘要: ${r.input_text.slice(0, 100)}...
+   涉及技术: ${techPoints?.map(p => p.term).join('、') || '无'}
+`;
+          }).join('\n')}`;
+        }
+      } catch (e) {
+        console.log('Could not fetch history:', e);
+      }
     }
     
     const customHeaders = HeaderUtils.extractForwardHeaders(request.headers);
@@ -99,7 +131,7 @@ export async function POST(request: NextRequest) {
       : '\n\n请使用简洁模式，输出精炼有效，直击要点。';
     
     const messages = [
-      { role: 'system' as const, content: SYSTEM_PROMPT + modeInstruction },
+      { role: 'system' as const, content: SYSTEM_PROMPT + historyContext + modeInstruction },
       { role: 'user' as const, content: `请分析以下对话内容：\n\n${inputText}` }
     ];
     
@@ -126,7 +158,6 @@ export async function POST(request: NextRequest) {
           // Try to parse JSON and save record
           if (saveRecord && userId) {
             try {
-              // Extract JSON from the response
               const jsonMatch = fullContent.match(/\{[\s\S]*\}/);
               if (jsonMatch) {
                 const parsedResult = JSON.parse(jsonMatch[0]);
@@ -156,8 +187,7 @@ export async function POST(request: NextRequest) {
                 }
               }
             } catch (parseError) {
-              // JSON parsing failed, but that's okay - the content is still useful
-              console.log('Could not parse JSON from response, skipping record save');
+              console.log('Could not parse JSON from response');
             }
           }
           
