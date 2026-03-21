@@ -9,19 +9,10 @@ import {
   Clock, 
   Copy,
   Check,
-  Loader2,
-  Zap
+  Loader2
 } from 'lucide-react';
 import { analyzeApi, uploadApi, getUserId } from '@/lib/api';
 import Link from 'next/link';
-
-// 高频场景
-const QUICK_SCENARIOS = [
-  { label: '说做不了', text: '这个需求技术上实现不了' },
-  { label: '要重构', text: '这个要做架构重构，工作量很大' },
-  { label: '排期长', text: '这个需求至少需要两周时间' },
-  { label: '有风险', text: '这样做会有风险，可能影响现有功能' },
-];
 
 export default function HomePage() {
   const [inputText, setInputText] = useState('');
@@ -40,12 +31,21 @@ export default function HomePage() {
     const handlePaste = async (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
       if (!items) return;
+      
+      // 收集所有图片
+      const imageFiles: File[] = [];
       for (const item of items) {
         if (item.type.startsWith('image/')) {
-          e.preventDefault();
           const file = item.getAsFile();
-          if (file) await processImageFile(file);
-          break;
+          if (file) imageFiles.push(file);
+        }
+      }
+      
+      if (imageFiles.length > 0) {
+        e.preventDefault();
+        // 依次处理所有图片，追加文本
+        for (const file of imageFiles) {
+          await processImageFile(file);
         }
       }
     };
@@ -60,8 +60,13 @@ export default function HomePage() {
       e.preventDefault();
       setIsDragging(false);
       const files = e.dataTransfer?.files;
-      if (files && files[0]?.type.startsWith('image/')) {
-        await processImageFile(files[0]);
+      if (files) {
+        // 处理所有拖入的图片
+        for (const file of files) {
+          if (file.type.startsWith('image/')) {
+            await processImageFile(file);
+          }
+        }
       }
     };
     document.addEventListener('dragover', handleDragOver);
@@ -78,7 +83,13 @@ export default function HomePage() {
     try {
       setIsAnalyzing(true);
       const result = await uploadApi.image(file);
-      if (result.text) setInputText(result.text);
+      if (result.text) {
+        // 追加而不是替换
+        setInputText(prev => {
+          const newText = result.text;
+          return prev ? `${prev}\n\n${newText}` : newText;
+        });
+      }
     } catch {
       alert('图片识别失败');
     } finally {
@@ -310,33 +321,11 @@ export default function HomePage() {
         {/* Left: Input */}
         <div className="w-[380px] shrink-0 border-r border-neutral-100 flex flex-col">
           <div className="p-4 flex-1 flex flex-col">
-            {/* Quick Scenarios */}
-            <div className="mb-3">
-              <div className="flex items-center gap-1.5 text-xs text-neutral-400 mb-2">
-                <Zap className="w-3 h-3" />
-                <span>高频场景</span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {QUICK_SCENARIOS.map((scenario) => (
-                  <button
-                    key={scenario.label}
-                    onClick={() => {
-                      setInputText(scenario.text);
-                      textareaRef.current?.focus();
-                    }}
-                    className="px-2.5 py-1 text-xs bg-neutral-100 text-neutral-600 rounded hover:bg-neutral-200 transition-colors"
-                  >
-                    {scenario.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* Input Area */}
             <div className="flex-1 flex flex-col">
               <Textarea
                 ref={textareaRef}
-                placeholder="粘贴开发说的话...&#10;&#10;支持 Ctrl+V 粘贴截图"
+                placeholder="粘贴开发说的话...&#10;&#10;支持 Ctrl+V 粘贴多张截图"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 className="flex-1 min-h-0 border-neutral-200 text-sm placeholder:text-neutral-400 focus:border-neutral-300 resize-none"
@@ -350,9 +339,15 @@ export default function HomePage() {
                 <input
                   type="file"
                   accept="image/*"
+                  multiple
                   className="hidden"
                   onChange={async (e) => {
-                    if (e.target.files?.[0]) await processImageFile(e.target.files[0]);
+                    const files = e.target.files;
+                    if (files) {
+                      for (const file of files) {
+                        await processImageFile(file);
+                      }
+                    }
                     e.target.value = '';
                   }}
                 />
