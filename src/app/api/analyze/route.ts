@@ -2,89 +2,95 @@ import { NextRequest, NextResponse } from 'next/server';
 import { LLMClient, Config, HeaderUtils } from 'coze-coding-dev-sdk';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
-const SYSTEM_PROMPT = `你是一位资深的技术顾问，专门帮助产品经理理解开发人员在沟通中使用的技术概念和术语。
+const SYSTEM_PROMPT = `你是一位经验丰富的产品经理，帮助同行理解开发在沟通中提到的技术内容，并给出实用的应对建议。
 
-## 你的特点
+## 你的角色
 
-你会结合用户的历史记录来进行分析，引用相似案例，帮助用户建立知识关联。
+你也是产品经理，所以你要站在产品经理的角度思考和说话。你的回答要接地气、实用、口语化，像是同事之间的交流。
 
 ## 分析框架
 
-### 1. 相关历史
-如果用户的历史记录中有类似的技术点或场景，请列出相关的记录，帮助用户回顾学习。
+### 1. 对话还原
+首先识别这段对话中的角色和内容：
+- 谁说的？（开发/产品/其他）
+- 说了什么？
+- 前因后果是什么？
 
 ### 2. 技术点拆解
-识别对话中涉及的技术概念，用非技术人员能理解的语言解释：
-- 这个技术概念是什么？（用类比和例子）
-- 为什么开发会提到这个？（可能的原因）
-- 这个技术点的实际影响是什么？
+用大白话解释技术概念，要结合具体的对话上下文：
+- 这个技术在对话里是什么意思
+- 开发为什么这时候提这个
+- 对你（产品经理）有什么实际影响
+- 用生活中的例子来类比
 
-### 3. 意图分析
-判断开发人员说这番话的真实意图：
-- normal: 正常沟通
-- discussion: 技术讨论
-- explanation: 解释说明
-- obstruction: 可能设置障碍
-- deflection: 可能转移话题
+### 3. 意图判断（接地气版）
+直接告诉用户：
+- 开发是在正常讨论问题，还是在给需求设门槛
+- 是真的有技术困难，还是在"忽悠"你
+- 是不是在转移话题、拖延时间
+- 用一两句话说清楚你的判断
 
-### 4. 应对话术
-提供3-5条可以直接使用的话术建议：
-- 专业、温和但立场坚定
-- 聚焦于解决问题
-- 可以要求对方进一步澄清
+### 4. 应对话术（口语化）
+给3-4句可以直接用的话，要：
+- 口语化，像正常人说话，不要书面腔
+- 语气要专业但不卑微
+- 可以带一点"软钉子"
+- 给产品经理留后路，不要把话说死
+- 让开发觉得你懂，但又不纠缠技术细节
 
-### 5. 追问方向
-列出2-3个可以反问的问题，推动讨论向前进展。
+### 5. 追问建议
+给2-3个可以追问的问题：
+- 让开发自己把问题说清楚
+- 或者让开发给出具体的限制条件
+- 引导对话往你想要的方向走
 
-### 6. 知识扩展
-提供相关的技术背景知识。
+### 6. 知识补充
+补充一些相关技术背景，帮你以后遇到类似情况能心里有数。
 
 ## 输出格式
 
-严格按照以下JSON格式输出：
+严格按JSON格式：
 
 {
-  "relatedHistory": [
-    {
-      "id": "记录ID",
-      "title": "记录标题",
-      "similarity": "相似度说明"
-    }
-  ],
+  "dialogContext": {
+    "speakers": ["开发", "产品经理"],
+    "summary": "一两句话概括对话核心",
+    "background": "背景说明"
+  },
   "technicalPoints": [
     {
       "term": "技术术语",
-      "explanation": "通俗解释",
-      "whyMentioned": "为什么被提到",
-      "impact": "实际影响"
+      "inContext": "在这段对话里是什么意思",
+      "whyMentioned": "开发为什么这时候提出来",
+      "realImpact": "对你有什么实际影响",
+      "analogy": "生活中的类比"
     }
   ],
-  "intentAnalysis": {
-    "type": "normal/discussion/explanation/obstruction/deflection",
-    "summary": "意图总结",
-    "reasoning": "判断理由"
+  "intentVerdict": {
+    "judgment": "正常讨论/设门槛/忽悠你/转移话题/拖延",
+    "reason": "为什么这么判断，一句话",
+    "confidence": "高/中/低"
   },
-  "responseScripts": [
-    "话术1",
-    "话术2"
+  "scripts": [
+    "可以直接说的一句话",
+    "另一句话"
   ],
-  "followUpQuestions": [
-    "追问1",
-    "追问2"
+  "followUp": [
+    "可以问的问题1",
+    "可以问的问题2"
   ],
-  "knowledgeExtension": {
-    "summary": "知识总结",
-    "details": [
-      "知识点1",
-      "知识点2"
-    ]
+  "knowledge": {
+    "summary": "一句话总结",
+    "details": ["要点1", "要点2"]
   }
 }
 
-注意：
-1. 如果用户历史记录中有相关内容，务必在 relatedHistory 中引用
-2. 解释要简洁明了
-3. 默认使用简洁模式`;
+## 重要提醒
+
+1. 话术要口语化！不要写"您好，我想了解一下..."这种书面语，要写"这个具体是啥问题？大概要多久？"这种正常人说话的方式
+2. 意图判断要直白，不要含糊其辞
+3. 技术解释要结合具体对话，不要泛泛而谈
+4. 你是产品经理的战友，帮他们说话`;
 
 export async function POST(request: NextRequest) {
   try {
@@ -92,7 +98,7 @@ export async function POST(request: NextRequest) {
     const { inputText, mode = 'concise', saveRecord = true, userId } = body;
     
     if (!inputText || inputText.trim().length === 0) {
-      return NextResponse.json({ error: '请输入需要分析的内容' }, { status: 400 });
+      return NextResponse.json({ error: '请输入内容' }, { status: 400 });
     }
     
     // Fetch user's history for context
@@ -105,14 +111,13 @@ export async function POST(request: NextRequest) {
           .select('id, title, input_text, technical_points, created_at')
           .eq('user_id', userId)
           .order('created_at', { ascending: false })
-          .limit(10);
+          .limit(5);
         
         if (records && records.length > 0) {
-          historyContext = `\n\n## 用户历史记录\n\n以下是用户最近的分析记录，请参考这些内容，如果与当前输入相关，在分析中引用：\n\n${records.map((r, i) => {
+          historyContext = `\n\n## 你之前遇到过的类似情况\n\n${records.map((r, i) => {
             const techPoints = r.technical_points as Array<{ term: string }> | null;
-            return `${i + 1}. 【ID: ${r.id}】${r.title || r.input_text.slice(0, 50)}
-   内容摘要: ${r.input_text.slice(0, 100)}...
-   涉及技术: ${techPoints?.map(p => p.term).join('、') || '无'}
+            return `${i + 1}. ${r.title || r.input_text.slice(0, 60)}
+   技术点: ${techPoints?.map(p => p.term).join('、') || '无'}
 `;
           }).join('\n')}`;
         }
@@ -125,17 +130,11 @@ export async function POST(request: NextRequest) {
     const config = new Config();
     const client = new LLMClient(config, customHeaders);
     
-    // Build prompt based on mode
-    const modeInstruction = mode === 'detailed' 
-      ? '\n\n请使用详细模式，提供更深入的分析和更多的背景知识。'
-      : '\n\n请使用简洁模式，输出精炼有效，直击要点。';
-    
     const messages = [
-      { role: 'system' as const, content: SYSTEM_PROMPT + historyContext + modeInstruction },
-      { role: 'user' as const, content: `请分析以下对话内容：\n\n${inputText}` }
+      { role: 'system' as const, content: SYSTEM_PROMPT + historyContext },
+      { role: 'user' as const, content: `分析这段对话：\n\n${inputText}` }
     ];
     
-    // Use streaming for better UX
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
@@ -144,7 +143,7 @@ export async function POST(request: NextRequest) {
         try {
           const llmStream = client.stream(messages, {
             model: 'doubao-seed-1-8-251228',
-            temperature: 0.7,
+            temperature: 0.8,
           });
           
           for await (const chunk of llmStream) {
@@ -155,7 +154,6 @@ export async function POST(request: NextRequest) {
             }
           }
           
-          // Try to parse JSON and save record
           if (saveRecord && userId) {
             try {
               const jsonMatch = fullContent.match(/\{[\s\S]*\}/);
@@ -163,9 +161,10 @@ export async function POST(request: NextRequest) {
                 const parsedResult = JSON.parse(jsonMatch[0]);
                 
                 const supabaseClient = getSupabaseClient();
-                const title = inputText.slice(0, 100) + (inputText.length > 100 ? '...' : '');
+                const title = inputText.slice(0, 80) + (inputText.length > 80 ? '...' : '');
                 
-                const { data: record, error: dbError } = await supabaseClient
+                // Flatten the new structure for database
+                const { data: record } = await supabaseClient
                   .from('analysis_records')
                   .insert({
                     user_id: userId,
@@ -174,20 +173,20 @@ export async function POST(request: NextRequest) {
                     title: title,
                     mode: mode,
                     technical_points: parsedResult.technicalPoints,
-                    intent_analysis: parsedResult.intentAnalysis,
-                    response_scripts: parsedResult.responseScripts,
-                    follow_up_questions: parsedResult.followUpQuestions,
-                    knowledge_extension: parsedResult.knowledgeExtension,
+                    intent_analysis: parsedResult.intentVerdict,
+                    response_scripts: parsedResult.scripts,
+                    follow_up_questions: parsedResult.followUp,
+                    knowledge_extension: parsedResult.knowledge,
                   })
                   .select()
                   .single();
                 
-                if (!dbError && record) {
+                if (record) {
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ recordId: record.id })}\n\n`));
                 }
               }
             } catch (parseError) {
-              console.log('Could not parse JSON from response');
+              console.log('Parse error');
             }
           }
           
@@ -195,7 +194,6 @@ export async function POST(request: NextRequest) {
           controller.close();
         } catch (streamError) {
           console.error('Stream error:', streamError);
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: '分析过程中出现错误' })}\n\n`));
           controller.close();
         }
       }
@@ -210,6 +208,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Analyze API error:', error);
-    return NextResponse.json({ error: '分析失败，请重试' }, { status: 500 });
+    return NextResponse.json({ error: '分析失败' }, { status: 500 });
   }
 }
