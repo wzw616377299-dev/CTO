@@ -24,11 +24,19 @@ interface ImageItem {
   isUploading: boolean;
 }
 
+// 场景标签
+const SCENARIOS = [
+  { id: 'work', label: '企微沟通', desc: '工作群聊、需求对接、技术评审' },
+  { id: 'understand', label: '技术理解', desc: '理解技术方案、评估可行性' },
+  { id: 'concept', label: '概念梳理', desc: '学习技术概念、扫清知识盲区' },
+];
+
 const MAX_IMAGES = 20;
 
 export default function HomePage() {
   const [inputText, setInputText] = useState('');
   const [images, setImages] = useState<ImageItem[]>([]);
+  const [selectedScenario, setSelectedScenario] = useState('work');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isOcring, setIsOcring] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<string>('');
@@ -49,7 +57,6 @@ export default function HomePage() {
       const items = e.clipboardData?.items;
       if (!items) return;
       
-      // 收集所有图片
       const imageFiles: File[] = [];
       for (const item of items) {
         if (item.type.startsWith('image/')) {
@@ -102,7 +109,6 @@ export default function HomePage() {
 
     const tempId = `temp-${Date.now()}`;
     
-    // 先添加一个占位项
     setImages(prev => [...prev, { 
       id: tempId, 
       url: '', 
@@ -113,7 +119,6 @@ export default function HomePage() {
     try {
       const result = await uploadApi.image(file);
       if (result.url) {
-        // 更新为真实URL
         setImages(prev => prev.map(img => 
           img.id === tempId 
             ? { ...img, url: result.url, isUploading: false }
@@ -121,7 +126,6 @@ export default function HomePage() {
         ));
       }
     } catch {
-      // 上传失败，移除占位项
       setImages(prev => prev.filter(img => img.id !== tempId));
       alert('图片上传失败');
     }
@@ -143,7 +147,6 @@ export default function HomePage() {
     try {
       let finalText = inputText;
       
-      // 如果有图片，先进行OCR
       if (hasImages) {
         setIsOcring(true);
         ocrAbortControllerRef.current = new AbortController();
@@ -165,9 +168,8 @@ export default function HomePage() {
         return;
       }
       
-      // 进行AI分析
       abortControllerRef.current = new AbortController();
-      const stream = await analyzeApi.stream(finalText, 'concise', abortControllerRef.current.signal);
+      const stream = await analyzeApi.stream(finalText, selectedScenario, abortControllerRef.current.signal);
       if (!stream) throw new Error('No stream');
       
       const reader = stream.getReader();
@@ -188,9 +190,6 @@ export default function HomePage() {
                 fullContent += parsed.content;
                 setAnalysisResult(fullContent);
               }
-              if (parsed.recordId) {
-                // 可以在这里保存图片URL到记录
-              }
             } catch {}
           }
         }
@@ -203,7 +202,7 @@ export default function HomePage() {
       abortControllerRef.current = null;
       ocrAbortControllerRef.current = null;
     }
-  }, [inputText, images]);
+  }, [inputText, images, selectedScenario]);
 
   const handleStop = useCallback(() => {
     if (abortControllerRef.current) {
@@ -222,7 +221,7 @@ export default function HomePage() {
     setTimeout(() => setCopiedText(null), 2000);
   };
 
-  // 简单的 Markdown 渲染
+  // Markdown 渲染
   const renderMarkdown = (content: string): React.ReactNode => {
     const lines = content.split('\n');
     const elements: React.ReactNode[] = [];
@@ -230,11 +229,13 @@ export default function HomePage() {
     let quoteContent: string[] = [];
     let inList = false;
     let listItems: string[] = [];
+    let inCodeBlock = false;
+    let codeContent: string[] = [];
 
     const flushQuote = () => {
       if (quoteContent.length > 0) {
         elements.push(
-          <div key={`quote-${elements.length}`} className="bg-neutral-50 border-l-2 border-neutral-800 pl-3 py-2 my-2 group relative">
+          <div key={`quote-${elements.length}`} className="bg-neutral-50 border-l-2 border-neutral-800 pl-3 py-2 my-2 group relative rounded-r">
             <div className="text-sm text-neutral-800 whitespace-pre-wrap leading-relaxed pr-8">
               {quoteContent.join('\n')}
             </div>
@@ -261,7 +262,7 @@ export default function HomePage() {
             {listItems.map((item, i) => (
               <div key={i} className="flex gap-2 text-sm text-neutral-700 group relative">
                 <span className="text-neutral-400 shrink-0">•</span>
-                <span className="flex-1">{item}</span>
+                <span className="flex-1">{renderInlineFormat(item)}</span>
                 <button
                   onClick={() => copyText(item)}
                   className="shrink-0 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-neutral-100 transition-all"
@@ -280,7 +281,62 @@ export default function HomePage() {
       }
     };
 
+    const flushCodeBlock = () => {
+      if (codeContent.length > 0) {
+        elements.push(
+          <div key={`code-${elements.length}`} className="bg-neutral-900 text-neutral-100 rounded-lg p-3 my-2 overflow-x-auto group relative">
+            <pre className="text-sm font-mono">{codeContent.join('\n')}</pre>
+            <button
+              onClick={() => copyText(codeContent.join('\n'))}
+              className="absolute top-2 right-2 p-1.5 rounded opacity-0 group-hover:opacity-100 hover:bg-neutral-800 transition-all"
+            >
+              {copiedText === codeContent.join('\n') ? (
+                <Check className="w-3.5 h-3.5 text-neutral-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-neutral-400" />
+              )}
+            </button>
+          </div>
+        );
+        codeContent = [];
+      }
+    };
+
+    const renderInlineFormat = (text: string): React.ReactNode => {
+      const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
+      return parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return <strong key={i} className="font-medium text-neutral-900">{part.slice(2, -2)}</strong>;
+        }
+        if (part.startsWith('*') && part.endsWith('*')) {
+          return <em key={i}>{part.slice(1, -1)}</em>;
+        }
+        if (part.startsWith('`') && part.endsWith('`')) {
+          return <code key={i} className="bg-neutral-100 px-1 rounded text-neutral-800">{part.slice(1, -1)}</code>;
+        }
+        return part;
+      });
+    };
+
     lines.forEach((line, idx) => {
+      // 代码块
+      if (line.startsWith('```')) {
+        if (inCodeBlock) {
+          flushCodeBlock();
+          inCodeBlock = false;
+        } else {
+          flushList();
+          flushQuote();
+          inCodeBlock = true;
+        }
+        return;
+      }
+      
+      if (inCodeBlock) {
+        codeContent.push(line);
+        return;
+      }
+
       // 引用块
       if (line.startsWith('> ')) {
         flushList();
@@ -307,7 +363,7 @@ export default function HomePage() {
         return;
       }
 
-      if (line.startsWith('1. ') || line.startsWith('2. ') || line.startsWith('3. ') || line.startsWith('4. ')) {
+      if (line.match(/^\d+\.\s/)) {
         flushQuote();
         inList = true;
         listItems.push(line.replace(/^\d+\.\s*/, ''));
@@ -319,11 +375,9 @@ export default function HomePage() {
         inList = false;
       }
 
-      if (inList) {
-        if (!line.startsWith('- ') && !line.match(/^\d+\.\s/)) {
-          flushList();
-          inList = false;
-        }
+      if (inList && !line.startsWith('- ') && !line.match(/^\d+\.\s/)) {
+        flushList();
+        inList = false;
       }
 
       // 标题
@@ -338,6 +392,14 @@ export default function HomePage() {
         return;
       }
 
+      // 分隔线
+      if (line.trim() === '---') {
+        flushList();
+        flushQuote();
+        elements.push(<hr key={idx} className="my-4 border-neutral-200" />);
+        return;
+      }
+
       // 空行
       if (line.trim() === '') {
         flushList();
@@ -349,21 +411,14 @@ export default function HomePage() {
       flushList();
       flushQuote();
       
-      const parts = line.split(/(\*\*[^*]+\*\*)/g);
-      const renderedLine = parts.map((part, i) => {
-        if (part.startsWith('**') && part.endsWith('**')) {
-          return <strong key={i} className="font-medium text-neutral-900">{part.slice(2, -2)}</strong>;
-        }
-        return part;
-      });
-
       elements.push(
         <p key={idx} className="text-sm text-neutral-700 leading-relaxed mb-1">
-          {renderedLine}
+          {renderInlineFormat(line)}
         </p>
       );
     });
 
+    flushCodeBlock();
     flushQuote();
     flushList();
 
@@ -384,10 +439,10 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Header - 限制宽度 1080px */}
+      {/* Header */}
       <header className="shrink-0 border-b border-neutral-100 bg-white">
         <div className="max-w-[1080px] mx-auto px-6 h-11 flex items-center justify-between">
-          <span className="text-sm font-medium text-neutral-900">PM 助手</span>
+          <span className="text-sm font-medium text-neutral-900">技术总监</span>
           <Link href="/history">
             <Button variant="ghost" size="sm" className="gap-1.5 text-neutral-500 hover:text-neutral-900 h-8">
               <Clock className="w-3.5 h-3.5" />
@@ -397,13 +452,34 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Main Content - 限制宽度 1080px */}
+      {/* Main Content */}
       <main className="flex-1 flex overflow-hidden justify-center">
         <div className="w-full max-w-[1080px] flex">
           {/* Left: Input */}
           <div className="w-[380px] shrink-0 border-r border-neutral-100 flex flex-col">
             <div className="p-4 flex-1 flex flex-col min-h-0">
-              {/* Image Preview Area */}
+              {/* Scenario Selection */}
+              <div className="mb-3">
+                <div className="text-xs text-neutral-400 mb-2">选择场景</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {SCENARIOS.map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => setSelectedScenario(s.id)}
+                      className={`px-2.5 py-1 text-xs rounded transition-colors ${
+                        selectedScenario === s.id
+                          ? 'bg-neutral-900 text-white'
+                          : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                      }`}
+                      title={s.desc}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Image Preview */}
               {images.length > 0 && (
                 <div className="mb-3">
                   <div className="flex items-center justify-between mb-2">
@@ -439,7 +515,7 @@ export default function HomePage() {
                 </div>
               )}
               
-              {/* Text Input Area */}
+              {/* Text Input */}
               <div className="flex-1 min-h-0 flex flex-col">
                 <Textarea
                   ref={textareaRef}
@@ -527,7 +603,7 @@ export default function HomePage() {
 
               {!isProcessing && !analysisResult && (
                 <div className="text-neutral-400 text-sm">
-                  输入开发说的话，我来帮你分析
+                  选择场景，输入内容，我来帮你分析
                 </div>
               )}
 

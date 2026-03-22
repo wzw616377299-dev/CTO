@@ -41,13 +41,13 @@ export const userApi = {
 
 // Analyze API - returns ReadableStream
 export const analyzeApi = {
-  stream: async (inputText: string, mode: 'concise' | 'detailed' = 'concise', signal?: AbortSignal) => {
+  stream: async (inputText: string, scenario: string = 'work', signal?: AbortSignal) => {
     const response = await fetch(getApiUrl('/analyze'), {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
         inputText,
-        mode,
+        scenario,
         saveRecord: true,
         userId: getUserId(),
       }),
