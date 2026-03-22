@@ -39,6 +39,12 @@ export const userApi = {
   },
 };
 
+// Message type for conversation
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 // Analyze API - returns ReadableStream
 export const analyzeApi = {
   stream: async (inputText: string, scenario: string = 'work', signal?: AbortSignal) => {
@@ -56,6 +62,28 @@ export const analyzeApi = {
     
     if (!response.ok) {
       throw new Error('分析请求失败');
+    }
+    
+    return response.body;
+  },
+  
+  // Follow-up question with conversation context
+  followUp: async (history: Message[], question: string, scenario: string = 'work', signal?: AbortSignal) => {
+    const response = await fetch(getApiUrl('/analyze'), {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        inputText: question,
+        scenario,
+        history,
+        isFollowUp: true,
+        userId: getUserId(),
+      }),
+      signal,
+    });
+    
+    if (!response.ok) {
+      throw new Error('追问请求失败');
     }
     
     return response.body;

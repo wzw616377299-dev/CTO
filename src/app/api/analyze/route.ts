@@ -222,7 +222,31 @@ const SYSTEM_PROMPT_CONCEPT = `你是月薪100万的资深技术总监，帮产�
 
 > [一句话记住这个概念]`;
 
-function getSystemPrompt(scenario: string): string {
+// 追问场景的系统提示
+const SYSTEM_PROMPT_FOLLOW_UP = `你是月薪100万的资深技术总监，正在和产品经理进行连续对话。
+
+## 你的角色
+
+基于之前的对话内容，回答产品经理的追问。保持上下文连贯，不要重复解释已经说过的内容。
+
+## 说话风格
+
+- 直接回答问题，不要重复之前说过的内容
+- 如果追问涉及到新的技术点，用大白话解释
+- 保持之前对话的语气和风格
+- 像朋友聊天一样自然
+
+## 输出要求
+
+- 直接回答用户的问题
+- 如果需要补充新的技术解释，简洁明了
+- 保持 Markdown 格式`;
+
+function getSystemPrompt(scenario: string, isFollowUp: boolean = false): string {
+  if (isFollowUp) {
+    return SYSTEM_PROMPT_FOLLOW_UP;
+  }
+  
   switch (scenario) {
     case 'understand':
       return SYSTEM_PROMPT_UNDERSTAND;
@@ -234,44 +258,36 @@ function getSystemPrompt(scenario: string): string {
   }
 }
 
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { inputText, imageUrls, scenario = 'work', mode = 'concise', saveRecord = true, userId } = body;
+    const { 
+      inputText, 
+      imageUrls, 
+      scenario = 'work', 
+      mode = 'concise', 
+      saveRecord = true, 
+      userId,
+      isFollowUp = false,
+      history = []
+    } = body as {
+      inputText?: string;
+      imageUrls?: string[];
+      scenario?: string;
+      mode?: string;
+      saveRecord?: boolean;
+      userId?: string;
+      isFollowUp?: boolean;
+      history?: Message[];
+    };
     
     if ((!inputText || inputText.trim().length === 0) && (!imageUrls || imageUrls.length === 0)) {
       return NextResponse.json({ error: '请输入内容' }, { status: 400 });
-    }
-    
-    // 识别用户（产品经理）的名字
-    const pmNames: string[] = [];
-    if (inputText.includes('王昭旺')) pmNames.push('王昭旺');
-    if (inputText.toLowerCase().includes('jairwang')) pmNames.push('jairwang');
-    
-    // 构建角色提示
-    let roleHint = '';
-    if (pmNames.length > 0) {
-      roleHint = `\n\n## 对话中的角色\n\n${pmNames.join(' 和 ')} 是产品经理，也就是你的用户。分析时如果提到这些名字，要知道这是你帮的人。`;
-    }
-    
-    // Fetch user's history for context
-    let historyContext = '';
-    if (userId) {
-      try {
-        const client = getSupabaseClient();
-        const { data: records } = await client
-          .from('analysis_records')
-          .select('id, title, input_text, created_at')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(3);
-        
-        if (records && records.length > 0) {
-          historyContext = `\n\n## 这位产品经理最近遇到的情况\n\n${records.map((r, i) => `${i + 1}. ${r.input_text.slice(0, 100)}`).join('\n')}\n\n（如果和当前情况有关联，可以提一下）`;
-        }
-      } catch (e) {
-        console.log('Could not fetch history:', e);
-      }
     }
     
     const customHeaders = HeaderUtils.extractForwardHeaders(request.headers);
@@ -279,14 +295,61 @@ export async function POST(request: NextRequest) {
     const client = new LLMClient(config, customHeaders);
     
     // 根据场景选择不同的系统提示
-    const systemPrompt = getSystemPrompt(scenario);
+    const systemPrompt = getSystemPrompt(scenario, isFollowUp);
     
-    const messages = [
-      { role: 'system' as const, content: systemPrompt + roleHint + historyContext },
-      { role: 'user' as const, content: scenario === 'concept' 
-        ? `请解释这个概念：\n\n${inputText}`
-        : `分析这段内容：\n\n${inputText}` }
-    ];
+    // 构建消息
+    let messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
+    
+    if (isFollowUp && history.length > 0) {
+      // 追问模式：带历史上下文
+      messages = [
+        { role: 'system', content: systemPrompt },
+        ...history.map(m => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content
+        })),
+        { role: 'user', content: inputText || '' }
+      ];
+    } else {
+      // 首次分析
+      // 识别用户（产品经理）的名字
+      const pmNames: string[] = [];
+      if (inputText?.includes('王昭旺')) pmNames.push('王昭旺');
+      if (inputText?.toLowerCase().includes('jairwang')) pmNames.push('jairwang');
+      
+      // 构建角色提示
+      let roleHint = '';
+      if (pmNames.length > 0) {
+        roleHint = `\n\n## 对话中的角色\n\n${pmNames.join(' 和 ')} 是产品经理，也就是你的用户。分析时如果提到这些名字，要知道这是你帮的人。`;
+      }
+      
+      // Fetch user's history for context
+      let historyContext = '';
+      if (userId) {
+        try {
+          const supabaseClient = getSupabaseClient();
+          const { data: records } = await supabaseClient
+            .from('analysis_records')
+            .select('id, title, input_text, created_at')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(3);
+          
+          if (records && records.length > 0) {
+            historyContext = `\n\n## 这位产品经理最近遇到的情况\n\n${records.map((r, i) => `${i + 1}. ${r.input_text.slice(0, 100)}`).join('\n')}\n\n（如果和当前情况有关联，可以提一下）`;
+          }
+        } catch (e) {
+          console.log('Could not fetch history:', e);
+        }
+      }
+      
+      messages = [
+        { role: 'system', content: systemPrompt + roleHint + historyContext },
+        { role: 'user', content: scenario === 'concept' 
+          ? `请解释这个概念：\n\n${inputText}`
+          : `分析这段内容：\n\n${inputText}` }
+      ];
+    }
     
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
@@ -307,16 +370,17 @@ export async function POST(request: NextRequest) {
             }
           }
           
-          if (saveRecord && userId) {
+          // 只在首次分析时保存记录
+          if (saveRecord && userId && !isFollowUp) {
             try {
               const supabaseClient = getSupabaseClient();
-              const title = inputText.slice(0, 80) + (inputText.length > 80 ? '...' : '');
+              const title = (inputText || '').slice(0, 80) + ((inputText?.length || 0) > 80 ? '...' : '');
               
               const { data: record } = await supabaseClient
                 .from('analysis_records')
                 .insert({
                   user_id: userId,
-                  input_text: inputText,
+                  input_text: inputText || '',
                   input_type: imageUrls && imageUrls.length > 0 ? 'image' : 'text',
                   image_urls: imageUrls || [],
                   title: title,

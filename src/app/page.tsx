@@ -12,7 +12,8 @@ import {
   Loader2,
   Square,
   X,
-  Plus
+  Plus,
+  MessageCircle
 } from 'lucide-react';
 import { analyzeApi, uploadApi, ocrApi, getUserId } from '@/lib/api';
 import Link from 'next/link';
@@ -22,6 +23,12 @@ interface ImageItem {
   url: string;
   name: string;
   isUploading: boolean;
+}
+
+// 对话消息
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
 }
 
 // 场景标签
@@ -43,14 +50,26 @@ export default function HomePage() {
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   
+  // 追问相关状态
+  const [followUpText, setFollowUpText] = useState('');
+  const [isFollowUp, setIsFollowUp] = useState(false);
+  const [conversationHistory, setConversationHistory] = useState<Message[]>([]);
+  
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const followUpRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const ocrAbortControllerRef = useRef<AbortController | null>(null);
+  const resultsEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     getUserId();
   }, []);
+
+  // 滚动到底部
+  useEffect(() => {
+    resultsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [analysisResult]);
 
   useEffect(() => {
     const handlePaste = async (e: ClipboardEvent) => {
@@ -135,6 +154,7 @@ export default function HomePage() {
     setImages(prev => prev.filter(img => img.id !== id));
   };
 
+  // 主分析
   const handleAnalyze = useCallback(async () => {
     const hasText = inputText.trim().length > 0;
     const hasImages = images.length > 0;
@@ -143,6 +163,7 @@ export default function HomePage() {
     
     setIsAnalyzing(true);
     setAnalysisResult('');
+    setConversationHistory([]); // 重置对话历史
     
     try {
       let finalText = inputText;
@@ -194,6 +215,12 @@ export default function HomePage() {
           }
         }
       }
+      
+      // 保存对话历史
+      setConversationHistory([
+        { role: 'user', content: finalText },
+        { role: 'assistant', content: fullContent }
+      ]);
     } catch {
       // 用户取消不提示
     } finally {
@@ -204,6 +231,60 @@ export default function HomePage() {
     }
   }, [inputText, images, selectedScenario]);
 
+  // 追问
+  const handleFollowUp = useCallback(async () => {
+    if (!followUpText.trim() || conversationHistory.length === 0) return;
+    
+    setIsFollowUp(true);
+    
+    // 先在界面上显示用户的问题
+    const userQuestion = followUpText;
+    setAnalysisResult(prev => prev + '\n\n---\n\n**追问：**\n\n' + userQuestion + '\n\n**回复：**\n\n');
+    setFollowUpText('');
+    
+    try {
+      abortControllerRef.current = new AbortController();
+      const stream = await analyzeApi.followUp(conversationHistory, userQuestion, selectedScenario, abortControllerRef.current.signal);
+      if (!stream) throw new Error('No stream');
+      
+      const reader = stream.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = '';
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value);
+        for (const line of chunk.split('\n')) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.content) {
+                fullContent += parsed.content;
+                setAnalysisResult(prev => prev + fullContent);
+                fullContent = '';
+              }
+            } catch {}
+          }
+        }
+      }
+      
+      // 更新对话历史
+      setConversationHistory(prev => [
+        ...prev,
+        { role: 'user', content: userQuestion },
+        { role: 'assistant', content: fullContent || '(已回复)' }
+      ]);
+    } catch {
+      // 用户取消不提示
+    } finally {
+      setIsFollowUp(false);
+      abortControllerRef.current = null;
+    }
+  }, [followUpText, conversationHistory, selectedScenario]);
+
   const handleStop = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -213,6 +294,7 @@ export default function HomePage() {
     }
     setIsAnalyzing(false);
     setIsOcring(false);
+    setIsFollowUp(false);
   }, []);
 
   const copyText = async (text: string) => {
@@ -425,8 +507,9 @@ export default function HomePage() {
     return elements;
   };
 
-  const isProcessing = isAnalyzing || isOcring;
+  const isProcessing = isAnalyzing || isOcring || isFollowUp;
   const canAnalyze = inputText.trim().length > 0 || images.length > 0;
+  const showFollowUp = !isProcessing && analysisResult && conversationHistory.length > 0;
 
   return (
     <div className="h-screen flex flex-col bg-white">
@@ -579,40 +662,79 @@ export default function HomePage() {
           </div>
 
           {/* Right: Results */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="p-6">
-              {isOcring && !isAnalyzing && (
-                <div className="flex items-center gap-2 text-neutral-400 text-sm">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>图片识别中...</span>
-                </div>
-              )}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-6">
+                {isOcring && !isAnalyzing && (
+                  <div className="flex items-center gap-2 text-neutral-400 text-sm">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>图片识别中...</span>
+                  </div>
+                )}
 
-              {isAnalyzing && !analysisResult && (
-                <div className="flex items-center gap-2 text-neutral-400 text-sm">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>分析中...</span>
-                </div>
-              )}
+                {(isAnalyzing || isFollowUp) && !analysisResult && (
+                  <div className="flex items-center gap-2 text-neutral-400 text-sm">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>分析中...</span>
+                  </div>
+                )}
 
-              {isAnalyzing && analysisResult && (
-                <div className="text-sm text-neutral-600 leading-relaxed">
-                  {renderMarkdown(analysisResult)}
-                </div>
-              )}
+                {(isAnalyzing || isFollowUp) && analysisResult && (
+                  <div className="text-sm text-neutral-600 leading-relaxed">
+                    {renderMarkdown(analysisResult)}
+                  </div>
+                )}
 
-              {!isProcessing && !analysisResult && (
-                <div className="text-neutral-400 text-sm">
-                  选择场景，输入内容，我来帮你分析
-                </div>
-              )}
+                {!isProcessing && !analysisResult && (
+                  <div className="text-neutral-400 text-sm">
+                    选择场景，输入内容，我来帮你分析
+                  </div>
+                )}
 
-              {!isProcessing && analysisResult && (
-                <div className="text-sm leading-relaxed">
-                  {renderMarkdown(analysisResult)}
-                </div>
-              )}
+                {!isProcessing && analysisResult && (
+                  <div className="text-sm leading-relaxed">
+                    {renderMarkdown(analysisResult)}
+                  </div>
+                )}
+                
+                <div ref={resultsEndRef} />
+              </div>
             </div>
+            
+            {/* Follow-up Input */}
+            {showFollowUp && (
+              <div className="shrink-0 border-t border-neutral-100 p-4 bg-white">
+                <div className="flex items-start gap-3">
+                  <MessageCircle className="w-4 h-4 text-neutral-400 mt-2.5 shrink-0" />
+                  <div className="flex-1">
+                    <div className="text-xs text-neutral-400 mb-1.5">继续追问</div>
+                    <div className="flex gap-2">
+                      <Textarea
+                        ref={followUpRef}
+                        placeholder="对上面的内容有疑问？继续问我..."
+                        value={followUpText}
+                        onChange={(e) => setFollowUpText(e.target.value)}
+                        className="min-h-[60px] max-h-[120px] border-neutral-200 text-sm placeholder:text-neutral-400 focus:border-neutral-300 resize-none"
+                        disabled={isFollowUp}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleFollowUp();
+                          }
+                        }}
+                      />
+                      <Button
+                        onClick={handleFollowUp}
+                        disabled={!followUpText.trim()}
+                        className="bg-neutral-900 hover:bg-neutral-800 text-white rounded h-8 px-3 text-sm shrink-0 mt-auto"
+                      >
+                        <ArrowUp className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </main>
