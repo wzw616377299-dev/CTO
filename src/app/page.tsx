@@ -13,7 +13,9 @@ import {
   Square,
   X,
   Plus,
-  MessageCircle
+  ExternalLink,
+  GitBranch,
+  Lightbulb
 } from 'lucide-react';
 import { analyzeApi, uploadApi, ocrApi, getUserId } from '@/lib/api';
 import Link from 'next/link';
@@ -25,17 +27,28 @@ interface ImageItem {
   isUploading: boolean;
 }
 
-// 对话消息
+interface SearchResult {
+  title: string;
+  url: string;
+  snippet: string;
+  siteName?: string;
+}
+
 interface Message {
   role: 'user' | 'assistant';
   content: string;
 }
 
-// 场景标签
 const SCENARIOS = [
-  { id: 'work', label: '企微沟通', desc: '工作群聊、需求对接、技术评审' },
+  { id: 'work', label: '企微沟通', desc: '工作群聊、需求对接' },
   { id: 'understand', label: '技术理解', desc: '理解技术方案、评估可行性' },
   { id: 'concept', label: '概念梳理', desc: '学习技术概念、扫清知识盲区' },
+];
+
+const EXAMPLE_PROMPTS = [
+  { text: '什么是微服务架构？', scenario: 'concept' },
+  { text: '开发说这个需求要两周，合理吗？', scenario: 'work' },
+  { text: '解释一下 Docker 和 Kubernetes 的区别', scenario: 'understand' },
 ];
 
 const MAX_IMAGES = 20;
@@ -50,10 +63,17 @@ export default function HomePage() {
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   
-  // 追问相关状态
+  // 追问
   const [followUpText, setFollowUpText] = useState('');
   const [isFollowUp, setIsFollowUp] = useState(false);
   const [conversationHistory, setConversationHistory] = useState<Message[]>([]);
+  
+  // 搜索结果
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  
+  // 汇报框架
+  const [reportContent, setReportContent] = useState<string>('');
+  const [generateReport, setGenerateReport] = useState(false);
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const followUpRef = useRef<HTMLTextAreaElement>(null);
@@ -66,10 +86,9 @@ export default function HomePage() {
     getUserId();
   }, []);
 
-  // 滚动到底部
   useEffect(() => {
     resultsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [analysisResult]);
+  }, [analysisResult, reportContent]);
 
   useEffect(() => {
     const handlePaste = async (e: ClipboardEvent) => {
@@ -127,21 +146,13 @@ export default function HomePage() {
     }
 
     const tempId = `temp-${Date.now()}`;
-    
-    setImages(prev => [...prev, { 
-      id: tempId, 
-      url: '', 
-      name: file.name,
-      isUploading: true 
-    }]);
+    setImages(prev => [...prev, { id: tempId, url: '', name: file.name, isUploading: true }]);
 
     try {
       const result = await uploadApi.image(file);
       if (result.url) {
         setImages(prev => prev.map(img => 
-          img.id === tempId 
-            ? { ...img, url: result.url, isUploading: false }
-            : img
+          img.id === tempId ? { ...img, url: result.url, isUploading: false } : img
         ));
       }
     } catch {
@@ -158,12 +169,13 @@ export default function HomePage() {
   const handleAnalyze = useCallback(async () => {
     const hasText = inputText.trim().length > 0;
     const hasImages = images.length > 0;
-    
     if (!hasText && !hasImages) return;
     
     setIsAnalyzing(true);
     setAnalysisResult('');
-    setConversationHistory([]); // 重置对话历史
+    setConversationHistory([]);
+    setSearchResults([]);
+    setReportContent('');
     
     try {
       let finalText = inputText;
@@ -171,16 +183,11 @@ export default function HomePage() {
       if (hasImages) {
         setIsOcring(true);
         ocrAbortControllerRef.current = new AbortController();
-        
         const imageUrls = images.filter(img => img.url).map(img => img.url);
         const ocrResult = await ocrApi.batch(imageUrls, ocrAbortControllerRef.current.signal);
-        
         if (ocrResult.text) {
-          finalText = finalText 
-            ? `${finalText}\n\n---\n\n${ocrResult.text}`
-            : ocrResult.text;
+          finalText = finalText ? `${finalText}\n\n---\n\n${ocrResult.text}` : ocrResult.text;
         }
-        
         setIsOcring(false);
       }
       
@@ -190,23 +197,45 @@ export default function HomePage() {
       }
       
       abortControllerRef.current = new AbortController();
-      const stream = await analyzeApi.stream(finalText, selectedScenario, abortControllerRef.current.signal);
+      const stream = await analyzeApi.stream(finalText, selectedScenario, abortControllerRef.current.signal, generateReport);
       if (!stream) throw new Error('No stream');
       
       const reader = stream.getReader();
       const decoder = new TextDecoder();
       let fullContent = '';
+      let inReport = false;
+      let reportText = '';
       
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         const chunk = decoder.decode(value);
+        
         for (const line of chunk.split('\n')) {
           if (line.startsWith('data: ')) {
             const data = line.slice(6);
             if (data === '[DONE]') continue;
+            
             try {
               const parsed = JSON.parse(data);
+              
+              // 搜索结果
+              if (parsed.searchResults) {
+                setSearchResults(parsed.searchResults);
+              }
+              
+              // 报告开始
+              if (parsed.reportStart) {
+                inReport = true;
+              }
+              
+              // 报告内容
+              if (parsed.reportContent) {
+                reportText += parsed.reportContent;
+                setReportContent(reportText);
+              }
+              
+              // 分析内容
               if (parsed.content) {
                 fullContent += parsed.content;
                 setAnalysisResult(fullContent);
@@ -216,27 +245,24 @@ export default function HomePage() {
         }
       }
       
-      // 保存对话历史
       setConversationHistory([
         { role: 'user', content: finalText },
         { role: 'assistant', content: fullContent }
       ]);
     } catch {
-      // 用户取消不提示
     } finally {
       setIsAnalyzing(false);
       setIsOcring(false);
       abortControllerRef.current = null;
       ocrAbortControllerRef.current = null;
     }
-  }, [inputText, images, selectedScenario]);
+  }, [inputText, images, selectedScenario, generateReport]);
 
   // 追问
   const handleFollowUp = useCallback(async () => {
     if (!followUpText.trim() || conversationHistory.length === 0) return;
     
     setIsFollowUp(true);
-    
     const userQuestion = followUpText;
     setFollowUpText('');
     
@@ -249,14 +275,9 @@ export default function HomePage() {
       const decoder = new TextDecoder();
       let replyContent = '';
       
-      // 先显示追问标题
       setAnalysisResult(prev => prev + '\n\n---\n\n**追问：**\n\n' + userQuestion + '\n\n**回复：**\n\n');
       
-      // 添加用户问题到历史（先不加回复，等流式结束再加）
-      const newHistory = [
-        ...conversationHistory,
-        { role: 'user' as const, content: userQuestion }
-      ];
+      const newHistory = [...conversationHistory, { role: 'user' as const, content: userQuestion }];
       
       while (true) {
         const { done, value } = await reader.read();
@@ -270,7 +291,6 @@ export default function HomePage() {
               const parsed = JSON.parse(data);
               if (parsed.content) {
                 replyContent += parsed.content;
-                // 只追加新内容
                 setAnalysisResult(prev => prev + parsed.content);
               }
             } catch {}
@@ -278,13 +298,8 @@ export default function HomePage() {
         }
       }
       
-      // 更新对话历史（包含回复）
-      setConversationHistory([
-        ...newHistory,
-        { role: 'assistant' as const, content: replyContent }
-      ]);
+      setConversationHistory([...newHistory, { role: 'assistant' as const, content: replyContent }]);
     } catch {
-      // 用户取消不提示
     } finally {
       setIsFollowUp(false);
       abortControllerRef.current = null;
@@ -292,12 +307,8 @@ export default function HomePage() {
   }, [followUpText, conversationHistory, selectedScenario]);
 
   const handleStop = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    if (ocrAbortControllerRef.current) {
-      ocrAbortControllerRef.current.abort();
-    }
+    abortControllerRef.current?.abort();
+    ocrAbortControllerRef.current?.abort();
     setIsAnalyzing(false);
     setIsOcring(false);
     setIsFollowUp(false);
@@ -323,19 +334,10 @@ export default function HomePage() {
     const flushQuote = () => {
       if (quoteContent.length > 0) {
         elements.push(
-          <div key={`quote-${elements.length}`} className="bg-neutral-50 border-l-2 border-neutral-800 pl-3 py-2 my-2 group relative rounded-r">
-            <div className="text-sm text-neutral-800 whitespace-pre-wrap leading-relaxed pr-8">
-              {quoteContent.join('\n')}
-            </div>
-            <button
-              onClick={() => copyText(quoteContent.join('\n'))}
-              className="absolute top-2 right-2 p-1.5 rounded opacity-0 group-hover:opacity-100 hover:bg-neutral-200 transition-all"
-            >
-              {copiedText === quoteContent.join('\n') ? (
-                <Check className="w-3.5 h-3.5 text-neutral-600" />
-              ) : (
-                <Copy className="w-3.5 h-3.5 text-neutral-400" />
-              )}
+          <div key={`quote-${elements.length}`} className="bg-amber-50 border-l-2 border-amber-400 pl-3 py-2 my-2 group relative rounded-r">
+            <div className="text-sm text-neutral-800 whitespace-pre-wrap leading-relaxed pr-8">{quoteContent.join('\n')}</div>
+            <button onClick={() => copyText(quoteContent.join('\n'))} className="absolute top-2 right-2 p-1.5 rounded opacity-0 group-hover:opacity-100 hover:bg-amber-100 transition-all">
+              {copiedText === quoteContent.join('\n') ? <Check className="w-3.5 h-3.5 text-neutral-600" /> : <Copy className="w-3.5 h-3.5 text-neutral-400" />}
             </button>
           </div>
         );
@@ -351,15 +353,8 @@ export default function HomePage() {
               <div key={i} className="flex gap-2 text-sm text-neutral-700 group relative">
                 <span className="text-neutral-400 shrink-0">•</span>
                 <span className="flex-1">{renderInlineFormat(item)}</span>
-                <button
-                  onClick={() => copyText(item)}
-                  className="shrink-0 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-neutral-100 transition-all"
-                >
-                  {copiedText === item ? (
-                    <Check className="w-3 h-3 text-neutral-600" />
-                  ) : (
-                    <Copy className="w-3 h-3 text-neutral-400" />
-                  )}
+                <button onClick={() => copyText(item)} className="shrink-0 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-neutral-100 transition-all">
+                  {copiedText === item ? <Check className="w-3 h-3 text-neutral-600" /> : <Copy className="w-3 h-3 text-neutral-400" />}
                 </button>
               </div>
             ))}
@@ -374,15 +369,8 @@ export default function HomePage() {
         elements.push(
           <div key={`code-${elements.length}`} className="bg-neutral-900 text-neutral-100 rounded-lg p-3 my-2 overflow-x-auto group relative">
             <pre className="text-sm font-mono">{codeContent.join('\n')}</pre>
-            <button
-              onClick={() => copyText(codeContent.join('\n'))}
-              className="absolute top-2 right-2 p-1.5 rounded opacity-0 group-hover:opacity-100 hover:bg-neutral-800 transition-all"
-            >
-              {copiedText === codeContent.join('\n') ? (
-                <Check className="w-3.5 h-3.5 text-neutral-400" />
-              ) : (
-                <Copy className="w-3.5 h-3.5 text-neutral-400" />
-              )}
+            <button onClick={() => copyText(codeContent.join('\n'))} className="absolute top-2 right-2 p-1.5 rounded opacity-0 group-hover:opacity-100 hover:bg-neutral-800 transition-all">
+              {copiedText === codeContent.join('\n') ? <Check className="w-3.5 h-3.5 text-neutral-400" /> : <Copy className="w-3.5 h-3.5 text-neutral-400" />}
             </button>
           </div>
         );
@@ -407,115 +395,36 @@ export default function HomePage() {
     };
 
     lines.forEach((line, idx) => {
-      // 代码块
       if (line.startsWith('```')) {
-        if (inCodeBlock) {
-          flushCodeBlock();
-          inCodeBlock = false;
-        } else {
-          flushList();
-          flushQuote();
-          inCodeBlock = true;
-        }
+        if (inCodeBlock) { flushCodeBlock(); inCodeBlock = false; }
+        else { flushList(); flushQuote(); inCodeBlock = true; }
         return;
       }
-      
-      if (inCodeBlock) {
-        codeContent.push(line);
-        return;
-      }
-
-      // 引用块
-      if (line.startsWith('> ')) {
-        flushList();
-        inQuote = true;
-        quoteContent.push(line.slice(2));
-        return;
-      }
-      
-      if (inQuote && line.startsWith('> ')) {
-        quoteContent.push(line.slice(2));
-        return;
-      }
-      
-      if (inQuote) {
-        flushQuote();
-        inQuote = false;
-      }
-
-      // 列表
-      if (line.startsWith('- ')) {
-        flushQuote();
-        inList = true;
-        listItems.push(line.slice(2));
-        return;
-      }
-
-      if (line.match(/^\d+\.\s/)) {
-        flushQuote();
-        inList = true;
-        listItems.push(line.replace(/^\d+\.\s*/, ''));
-        return;
-      }
-
-      if (inList && line.trim() === '') {
-        flushList();
-        inList = false;
-      }
-
-      if (inList && !line.startsWith('- ') && !line.match(/^\d+\.\s/)) {
-        flushList();
-        inList = false;
-      }
-
-      // 标题
+      if (inCodeBlock) { codeContent.push(line); return; }
+      if (line.startsWith('> ')) { flushList(); inQuote = true; quoteContent.push(line.slice(2)); return; }
+      if (inQuote && line.startsWith('> ')) { quoteContent.push(line.slice(2)); return; }
+      if (inQuote) { flushQuote(); inQuote = false; }
+      if (line.startsWith('- ')) { flushQuote(); inList = true; listItems.push(line.slice(2)); return; }
+      if (line.match(/^\d+\.\s/)) { flushQuote(); inList = true; listItems.push(line.replace(/^\d+\.\s*/, '')); return; }
+      if (inList && line.trim() === '') { flushList(); inList = false; }
+      if (inList && !line.startsWith('- ') && !line.match(/^\d+\.\s/)) { flushList(); inList = false; }
       if (line.startsWith('**') && line.endsWith('**')) {
         flushList();
-        const title = line.slice(2, -2);
-        elements.push(
-          <h3 key={idx} className="text-sm font-medium text-neutral-900 mt-5 mb-2 first:mt-0">
-            {title}
-          </h3>
-        );
+        elements.push(<h3 key={idx} className="text-sm font-medium text-neutral-900 mt-5 mb-2 first:mt-0">{line.slice(2, -2)}</h3>);
         return;
       }
-
-      // 分隔线
-      if (line.trim() === '---') {
-        flushList();
-        flushQuote();
-        elements.push(<hr key={idx} className="my-4 border-neutral-200" />);
-        return;
-      }
-
-      // 空行
-      if (line.trim() === '') {
-        flushList();
-        flushQuote();
-        return;
-      }
-
-      // 普通段落
-      flushList();
-      flushQuote();
-      
-      elements.push(
-        <p key={idx} className="text-sm text-neutral-700 leading-relaxed mb-1">
-          {renderInlineFormat(line)}
-        </p>
-      );
+      if (line.trim() === '---') { flushList(); flushQuote(); elements.push(<hr key={idx} className="my-4 border-neutral-200" />); return; }
+      if (line.trim() === '') { flushList(); flushQuote(); return; }
+      flushList(); flushQuote();
+      elements.push(<p key={idx} className="text-sm text-neutral-700 leading-relaxed mb-1">{renderInlineFormat(line)}</p>);
     });
 
-    flushCodeBlock();
-    flushQuote();
-    flushList();
-
+    flushCodeBlock(); flushQuote(); flushList();
     return elements;
   };
 
   const isProcessing = isAnalyzing || isOcring || isFollowUp;
   const canAnalyze = inputText.trim().length > 0 || images.length > 0;
-  const showFollowUp = !isProcessing && analysisResult && conversationHistory.length > 0;
 
   return (
     <div className="h-screen flex flex-col bg-white">
@@ -541,62 +450,58 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="flex-1 flex overflow-hidden justify-center">
         <div className="w-full max-w-[1080px] flex">
           {/* Left: Input */}
-          <div className="w-[380px] shrink-0 border-r border-neutral-100 flex flex-col">
+          <div className="w-[360px] shrink-0 border-r border-neutral-100 flex flex-col">
             <div className="p-4 flex-1 flex flex-col min-h-0">
-              {/* Scenario Selection */}
+              {/* Scenario */}
               <div className="mb-3">
                 <div className="text-xs text-neutral-400 mb-2">选择场景</div>
                 <div className="flex flex-wrap gap-1.5">
                   {SCENARIOS.map((s) => (
-                    <button
-                      key={s.id}
-                      onClick={() => setSelectedScenario(s.id)}
-                      className={`px-2.5 py-1 text-xs rounded transition-colors ${
-                        selectedScenario === s.id
-                          ? 'bg-neutral-900 text-white'
-                          : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-                      }`}
-                      title={s.desc}
-                    >
+                    <button key={s.id} onClick={() => setSelectedScenario(s.id)}
+                      className={`px-2.5 py-1 text-xs rounded transition-colors ${selectedScenario === s.id ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'}`}
+                      title={s.desc}>
                       {s.label}
                     </button>
                   ))}
                 </div>
               </div>
               
-              {/* Image Preview */}
+              {/* 示例提示 */}
+              {!analysisResult && !isProcessing && (
+                <div className="mb-3 p-3 bg-neutral-50 rounded-lg">
+                  <div className="flex items-center gap-1.5 text-xs text-neutral-500 mb-2">
+                    <Lightbulb className="w-3.5 h-3.5" />
+                    试试这些
+                  </div>
+                  <div className="space-y-1.5">
+                    {EXAMPLE_PROMPTS.map((p, i) => (
+                      <button key={i} onClick={() => { setInputText(p.text); setSelectedScenario(p.scenario); }}
+                        className="block w-full text-left text-xs text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 px-2 py-1.5 rounded transition-colors">
+                        {p.text}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Images */}
               {images.length > 0 && (
                 <div className="mb-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-neutral-500">{images.length}/{MAX_IMAGES} 张图片</span>
-                  </div>
+                  <div className="text-xs text-neutral-500 mb-2">{images.length}/{MAX_IMAGES} 张图片</div>
                   <div className="grid grid-cols-4 gap-2">
                     {images.map((img) => (
                       <div key={img.id} className="relative aspect-square bg-neutral-100 rounded overflow-hidden group">
-                        {img.isUploading ? (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Loader2 className="w-5 h-5 animate-spin text-neutral-400" />
-                          </div>
-                        ) : (
-                          <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
-                        )}
-                        <button
-                          onClick={() => removeImage(img.id)}
-                          className="absolute top-1 right-1 w-5 h-5 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
+                        {img.isUploading ? <Loader2 className="w-5 h-5 animate-spin text-neutral-400 m-auto" /> : <img src={img.url} alt={img.name} className="w-full h-full object-cover" />}
+                        <button onClick={() => removeImage(img.id)} className="absolute top-1 right-1 w-5 h-5 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                           <X className="w-3 h-3 text-white" />
                         </button>
                       </div>
                     ))}
                     {images.length < MAX_IMAGES && (
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="aspect-square border-2 border-dashed border-neutral-200 rounded flex items-center justify-center hover:border-neutral-300 transition-colors"
-                      >
+                      <button onClick={() => fileInputRef.current?.click()} className="aspect-square border-2 border-dashed border-neutral-200 rounded flex items-center justify-center hover:border-neutral-300 transition-colors">
                         <Plus className="w-5 h-5 text-neutral-400" />
                       </button>
                     )}
@@ -605,60 +510,37 @@ export default function HomePage() {
               )}
               
               {/* Text Input */}
-              <div className="flex-1 min-h-0 flex flex-col">
-                <Textarea
-                  ref={textareaRef}
-                  placeholder="粘贴开发说的话...&#10;&#10;支持 Ctrl+V 粘贴截图"
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  className="flex-1 min-h-0 border-neutral-200 text-sm placeholder:text-neutral-400 focus:border-neutral-300 resize-none overflow-y-auto"
-                  disabled={isProcessing}
-                />
-              </div>
+              <Textarea ref={textareaRef} placeholder="粘贴开发说的话...&#10;&#10;支持 Ctrl+V 粘贴截图" value={inputText} onChange={(e) => setInputText(e.target.value)}
+                className="flex-1 min-h-0 border-neutral-200 text-sm placeholder:text-neutral-400 focus:border-neutral-300 resize-none overflow-y-auto" disabled={isProcessing} />
+              
+              {/* 生成汇报选项 */}
+              <label className="flex items-center gap-2 mt-3 text-xs text-neutral-500 cursor-pointer">
+                <input type="checkbox" checked={generateReport} onChange={(e) => setGenerateReport(e.target.checked)} className="rounded border-neutral-300" />
+                <GitBranch className="w-3.5 h-3.5" />
+                生成汇报框架（金字塔原理）
+              </label>
               
               {/* Toolbar */}
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-100">
-                <div className="flex items-center gap-2">
-                  {images.length < MAX_IMAGES && (
-                    <label className="cursor-pointer">
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={async (e) => {
-                          const files = e.target.files;
-                          if (files) {
-                            for (const file of files) {
-                              await uploadImage(file);
-                            }
-                          }
-                          e.target.value = '';
-                        }}
-                      />
-                      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-sm text-neutral-500 hover:text-neutral-900 hover:bg-neutral-50 transition-colors">
-                        <Image className="w-4 h-4" />
-                        <span>图片</span>
-                      </div>
-                    </label>
-                  )}
-                </div>
+                <label className="cursor-pointer">
+                  <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={async (e) => {
+                    const files = e.target.files;
+                    if (files) { for (const file of files) await uploadImage(file); }
+                    e.target.value = '';
+                  }} />
+                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-sm text-neutral-500 hover:text-neutral-900 hover:bg-neutral-50 transition-colors">
+                    <Image className="w-4 h-4" />
+                    <span>图片</span>
+                  </div>
+                </label>
                 
                 {isProcessing ? (
-                  <Button
-                    onClick={handleStop}
-                    className="bg-neutral-900 hover:bg-neutral-800 text-white rounded h-8 px-3 text-sm"
-                  >
+                  <Button onClick={handleStop} className="bg-neutral-900 hover:bg-neutral-800 text-white rounded h-8 px-3 text-sm">
                     <Square className="w-3.5 h-3.5 mr-1" />
                     停止
                   </Button>
                 ) : (
-                  <Button
-                    onClick={handleAnalyze}
-                    disabled={!canAnalyze}
-                    className="bg-neutral-900 hover:bg-neutral-800 text-white rounded h-8 px-3 text-sm"
-                  >
+                  <Button onClick={handleAnalyze} disabled={!canAnalyze} className="bg-neutral-900 hover:bg-neutral-800 text-white rounded h-8 px-3 text-sm">
                     <ArrowUp className="w-3.5 h-3.5 mr-1" />
                     分析
                   </Button>
@@ -669,78 +551,99 @@ export default function HomePage() {
 
           {/* Right: Results */}
           <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex-1 overflow-y-auto">
-              <div className="p-6">
-                {isOcring && !isAnalyzing && (
-                  <div className="flex items-center gap-2 text-neutral-400 text-sm">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>图片识别中...</span>
-                  </div>
-                )}
-
-                {(isAnalyzing || isFollowUp) && !analysisResult && (
-                  <div className="flex items-center gap-2 text-neutral-400 text-sm">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>分析中...</span>
-                  </div>
-                )}
-
-                {(isAnalyzing || isFollowUp) && analysisResult && (
-                  <div className="text-sm text-neutral-600 leading-relaxed">
-                    {renderMarkdown(analysisResult)}
-                  </div>
-                )}
-
-                {!isProcessing && !analysisResult && (
-                  <div className="text-neutral-400 text-sm">
-                    选择场景，输入内容，我来帮你分析
-                  </div>
-                )}
-
-                {!isProcessing && analysisResult && (
-                  <div className="text-sm leading-relaxed">
-                    {renderMarkdown(analysisResult)}
-                  </div>
-                )}
-                
-                <div ref={resultsEndRef} />
-              </div>
-            </div>
-            
-            {/* Follow-up Input */}
-            {showFollowUp && (
-              <div className="shrink-0 border-t border-neutral-100 p-4 bg-white">
-                <div className="flex items-start gap-3">
-                  <MessageCircle className="w-4 h-4 text-neutral-400 mt-2.5 shrink-0" />
-                  <div className="flex-1">
-                    <div className="text-xs text-neutral-400 mb-1.5">继续追问</div>
-                    <div className="flex gap-2">
-                      <Textarea
-                        ref={followUpRef}
-                        placeholder="对上面的内容有疑问？继续问我..."
-                        value={followUpText}
-                        onChange={(e) => setFollowUpText(e.target.value)}
-                        className="min-h-[60px] max-h-[120px] border-neutral-200 text-sm placeholder:text-neutral-400 focus:border-neutral-300 resize-none"
-                        disabled={isFollowUp}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleFollowUp();
-                          }
-                        }}
-                      />
-                      <Button
-                        onClick={handleFollowUp}
-                        disabled={!followUpText.trim()}
-                        className="bg-neutral-900 hover:bg-neutral-800 text-white rounded h-8 px-3 text-sm shrink-0 mt-auto"
-                      >
-                        <ArrowUp className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              {/* 搜索结果 */}
+              {searchResults.length > 0 && (
+                <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                  <div className="text-xs text-blue-600 mb-2">📚 联网搜索参考</div>
+                  <div className="space-y-2">
+                    {searchResults.map((r, i) => (
+                      <a key={i} href={r.url} target="_blank" rel="noopener noreferrer" className="block text-sm text-neutral-700 hover:text-neutral-900 group">
+                        <div className="flex items-start gap-1.5">
+                          <span className="text-neutral-400">{i + 1}.</span>
+                          <div>
+                            <div className="font-medium group-hover:underline">{r.title}</div>
+                            <div className="text-xs text-neutral-500 mt-0.5">{r.snippet?.slice(0, 100)}...</div>
+                          </div>
+                          <ExternalLink className="w-3 h-3 text-neutral-400 shrink-0 mt-1 opacity-0 group-hover:opacity-100" />
+                        </div>
+                      </a>
+                    ))}
                   </div>
                 </div>
+              )}
+              
+              {/* 分析结果 */}
+              {isOcring && !isAnalyzing && (
+                <div className="flex items-center gap-2 text-neutral-400 text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>图片识别中...</span>
+                </div>
+              )}
+
+              {(isAnalyzing || isFollowUp) && !analysisResult && (
+                <div className="flex items-center gap-2 text-neutral-400 text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>分析中...</span>
+                </div>
+              )}
+
+              {!isProcessing && !analysisResult && !searchResults.length && (
+                <div className="text-neutral-400 text-sm">选择场景，输入内容，我来帮你分析</div>
+              )}
+
+              {analysisResult && (
+                <div className="text-sm leading-relaxed">{renderMarkdown(analysisResult)}</div>
+              )}
+              
+              {/* 汇报框架 */}
+              {reportContent && (
+                <div className="mt-6 pt-6 border-t border-neutral-200">
+                  <div className="flex items-center gap-2 mb-4">
+                    <GitBranch className="w-4 h-4 text-neutral-600" />
+                    <span className="text-sm font-medium text-neutral-900">向上级汇报框架</span>
+                  </div>
+                  <div className="text-sm leading-relaxed">{renderMarkdown(reportContent)}</div>
+                </div>
+              )}
+              
+              <div ref={resultsEndRef} />
+            </div>
+            
+            {/* 追问输入框 - 始终显示 */}
+            <div className="shrink-0 border-t border-neutral-100 p-4 bg-white">
+              <div className="flex items-start gap-3">
+                <div className="flex-1">
+                  <Textarea ref={followUpRef} placeholder={conversationHistory.length > 0 ? "继续追问..." : "输入问题开始分析..."} value={followUpText}
+                    onChange={(e) => setFollowUpText(e.target.value)}
+                    className="min-h-[44px] max-h-[120px] border-neutral-200 text-sm placeholder:text-neutral-400 focus:border-neutral-300 resize-none"
+                    disabled={isFollowUp || isAnalyzing}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (conversationHistory.length > 0) {
+                          handleFollowUp();
+                        } else if (canAnalyze) {
+                          handleAnalyze();
+                        }
+                      }
+                    }} />
+                </div>
+                {isProcessing ? (
+                  <Button onClick={handleStop} className="bg-neutral-900 hover:bg-neutral-800 text-white rounded h-9 px-3 text-sm shrink-0">
+                    <Square className="w-3.5 h-3.5" />
+                  </Button>
+                ) : conversationHistory.length > 0 ? (
+                  <Button onClick={handleFollowUp} disabled={!followUpText.trim()} className="bg-neutral-900 hover:bg-neutral-800 text-white rounded h-9 px-3 text-sm shrink-0">
+                    <ArrowUp className="w-3.5 h-3.5" />
+                  </Button>
+                ) : (
+                  <Button onClick={handleAnalyze} disabled={!canAnalyze} className="bg-neutral-900 hover:bg-neutral-800 text-white rounded h-9 px-3 text-sm shrink-0">
+                    <ArrowUp className="w-3.5 h-3.5" />
+                  </Button>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </div>
       </main>
