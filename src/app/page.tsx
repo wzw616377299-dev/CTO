@@ -9,7 +9,8 @@ import {
   Clock, 
   Copy,
   Check,
-  Loader2
+  Loader2,
+  Square
 } from 'lucide-react';
 import { analyzeApi, uploadApi, getUserId } from '@/lib/api';
 import Link from 'next/link';
@@ -17,11 +18,14 @@ import Link from 'next/link';
 export default function HomePage() {
   const [inputText, setInputText] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isOcring, setIsOcring] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<string>('');
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const ocrAbortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     getUserId();
@@ -81,8 +85,9 @@ export default function HomePage() {
 
   const processImageFile = async (file: File) => {
     try {
-      setIsAnalyzing(true);
-      const result = await uploadApi.image(file);
+      setIsOcring(true);
+      ocrAbortControllerRef.current = new AbortController();
+      const result = await uploadApi.image(file, ocrAbortControllerRef.current.signal);
       if (result.text) {
         // 追加而不是替换
         setInputText(prev => {
@@ -97,9 +102,10 @@ export default function HomePage() {
         }, 0);
       }
     } catch {
-      alert('图片识别失败');
+      // 用户取消不提示
     } finally {
-      setIsAnalyzing(false);
+      setIsOcring(false);
+      ocrAbortControllerRef.current = null;
     }
   };
 
@@ -109,7 +115,8 @@ export default function HomePage() {
     setAnalysisResult('');
     
     try {
-      const stream = await analyzeApi.stream(inputText, 'concise');
+      abortControllerRef.current = new AbortController();
+      const stream = await analyzeApi.stream(inputText, 'concise', abortControllerRef.current.signal);
       if (!stream) throw new Error('No stream');
       
       const reader = stream.getReader();
@@ -135,11 +142,23 @@ export default function HomePage() {
         }
       }
     } catch {
-      alert('分析失败');
+      // 用户取消不提示
     } finally {
       setIsAnalyzing(false);
+      abortControllerRef.current = null;
     }
   }, [inputText, isAnalyzing]);
+
+  const handleStop = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    if (ocrAbortControllerRef.current) {
+      ocrAbortControllerRef.current.abort();
+    }
+    setIsAnalyzing(false);
+    setIsOcring(false);
+  }, []);
 
   const copyText = async (text: string) => {
     await navigator.clipboard.writeText(text);
@@ -298,6 +317,8 @@ export default function HomePage() {
     return elements;
   };
 
+  const isProcessing = isAnalyzing || isOcring;
+
   return (
     <div className="h-screen flex flex-col bg-white">
       {isDragging && (
@@ -309,9 +330,9 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Header */}
+      {/* Header - 限制宽度 1080px */}
       <header className="shrink-0 border-b border-neutral-100 bg-white">
-        <div className="max-w-7xl mx-auto px-6 h-11 flex items-center justify-between">
+        <div className="max-w-[1080px] mx-auto px-6 h-11 flex items-center justify-between">
           <span className="text-sm font-medium text-neutral-900">PM 助手</span>
           <Link href="/history">
             <Button variant="ghost" size="sm" className="gap-1.5 text-neutral-500 hover:text-neutral-900 h-8">
@@ -322,92 +343,105 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 flex overflow-hidden">
-        {/* Left: Input */}
-        <div className="w-[380px] shrink-0 border-r border-neutral-100 flex flex-col">
-          <div className="p-4 flex-1 flex flex-col min-h-0">
-            {/* Input Area */}
-            <div className="flex-1 min-h-0 flex flex-col">
-              <Textarea
-                ref={textareaRef}
-                placeholder="粘贴开发说的话...&#10;&#10;支持 Ctrl+V 粘贴多张截图"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                className="flex-1 min-h-0 border-neutral-200 text-sm placeholder:text-neutral-400 focus:border-neutral-300 resize-none overflow-y-auto"
-                disabled={isAnalyzing}
-              />
-            </div>
-            
-            {/* Toolbar */}
-            <div className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-100">
-              <label className="cursor-pointer">
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={async (e) => {
-                    const files = e.target.files;
-                    if (files) {
-                      for (const file of files) {
-                        await processImageFile(file);
-                      }
-                    }
-                    e.target.value = '';
-                  }}
+      {/* Main Content - 限制宽度 1080px */}
+      <main className="flex-1 flex overflow-hidden justify-center">
+        <div className="w-full max-w-[1080px] flex">
+          {/* Left: Input */}
+          <div className="w-[380px] shrink-0 border-r border-neutral-100 flex flex-col">
+            <div className="p-4 flex-1 flex flex-col min-h-0">
+              {/* Input Area */}
+              <div className="flex-1 min-h-0 flex flex-col">
+                <Textarea
+                  ref={textareaRef}
+                  placeholder="粘贴开发说的话...&#10;&#10;支持 Ctrl+V 粘贴多张截图"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  className="flex-1 min-h-0 border-neutral-200 text-sm placeholder:text-neutral-400 focus:border-neutral-300 resize-none overflow-y-auto"
+                  disabled={isProcessing}
                 />
-                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-sm text-neutral-500 hover:text-neutral-900 hover:bg-neutral-50 transition-colors">
-                  <Image className="w-4 h-4" />
-                  <span>图片</span>
-                </div>
-              </label>
+              </div>
               
-              <Button
-                onClick={handleAnalyze}
-                disabled={!inputText.trim() || isAnalyzing}
-                className="bg-neutral-900 hover:bg-neutral-800 text-white rounded h-8 px-3 text-sm"
-              >
-                {isAnalyzing ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+              {/* Toolbar */}
+              <div className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-100">
+                <label className="cursor-pointer">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={async (e) => {
+                      const files = e.target.files;
+                      if (files) {
+                        for (const file of files) {
+                          await processImageFile(file);
+                        }
+                      }
+                      e.target.value = '';
+                    }}
+                  />
+                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-sm text-neutral-500 hover:text-neutral-900 hover:bg-neutral-50 transition-colors">
+                    <Image className="w-4 h-4" />
+                    <span>图片</span>
+                  </div>
+                </label>
+                
+                {isProcessing ? (
+                  <Button
+                    onClick={handleStop}
+                    className="bg-neutral-900 hover:bg-neutral-800 text-white rounded h-8 px-3 text-sm"
+                  >
+                    <Square className="w-3.5 h-3.5 mr-1" />
+                    停止
+                  </Button>
                 ) : (
-                  <>
+                  <Button
+                    onClick={handleAnalyze}
+                    disabled={!inputText.trim()}
+                    className="bg-neutral-900 hover:bg-neutral-800 text-white rounded h-8 px-3 text-sm"
+                  >
                     <ArrowUp className="w-3.5 h-3.5 mr-1" />
                     分析
-                  </>
+                  </Button>
                 )}
-              </Button>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Right: Results */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-6 max-w-3xl">
-            {isAnalyzing && !analysisResult && (
-              <div className="flex items-center gap-2 text-neutral-400 text-sm">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>分析中...</span>
-              </div>
-            )}
+          {/* Right: Results */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-6">
+              {isOcring && !isAnalyzing && (
+                <div className="flex items-center gap-2 text-neutral-400 text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>图片识别中...</span>
+                </div>
+              )}
 
-            {isAnalyzing && analysisResult && (
-              <div className="text-sm text-neutral-600 leading-relaxed">
-                {renderMarkdown(analysisResult)}
-              </div>
-            )}
+              {isAnalyzing && !analysisResult && (
+                <div className="flex items-center gap-2 text-neutral-400 text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>分析中...</span>
+                </div>
+              )}
 
-            {!isAnalyzing && !analysisResult && (
-              <div className="text-neutral-400 text-sm">
-                输入开发说的话，我来帮你分析
-              </div>
-            )}
+              {isAnalyzing && analysisResult && (
+                <div className="text-sm text-neutral-600 leading-relaxed">
+                  {renderMarkdown(analysisResult)}
+                </div>
+              )}
 
-            {!isAnalyzing && analysisResult && (
-              <div className="text-sm leading-relaxed">
-                {renderMarkdown(analysisResult)}
-              </div>
-            )}
+              {!isProcessing && !analysisResult && (
+                <div className="text-neutral-400 text-sm">
+                  输入开发说的话，我来帮你分析
+                </div>
+              )}
+
+              {!isProcessing && analysisResult && (
+                <div className="text-sm leading-relaxed">
+                  {renderMarkdown(analysisResult)}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </main>

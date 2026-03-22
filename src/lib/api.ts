@@ -41,7 +41,7 @@ export const userApi = {
 
 // Analyze API - returns ReadableStream
 export const analyzeApi = {
-  stream: async (inputText: string, mode: 'concise' | 'detailed' = 'concise') => {
+  stream: async (inputText: string, mode: 'concise' | 'detailed' = 'concise', signal?: AbortSignal) => {
     const response = await fetch(getApiUrl('/analyze'), {
       method: 'POST',
       headers: getHeaders(),
@@ -51,6 +51,7 @@ export const analyzeApi = {
         saveRecord: true,
         userId: getUserId(),
       }),
+      signal,
     });
     
     if (!response.ok) {
@@ -154,7 +155,7 @@ export const tagsApi = {
 
 // Upload API
 export const uploadApi = {
-  image: async (file: File) => {
+  image: async (file: File, signal?: AbortSignal) => {
     const formData = new FormData();
     formData.append('file', file);
     
@@ -164,11 +165,12 @@ export const uploadApi = {
         'x-user-id': getUserId(),
       },
       body: formData,
+      signal,
     });
     return response.json();
   },
   
-  audio: async (file: File) => {
+  audio: async (file: File, signal?: AbortSignal) => {
     const formData = new FormData();
     formData.append('file', file);
     
@@ -178,6 +180,7 @@ export const uploadApi = {
         'x-user-id': getUserId(),
       },
       body: formData,
+      signal,
     });
     return response.json();
   },
