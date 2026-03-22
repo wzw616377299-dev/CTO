@@ -237,9 +237,7 @@ export default function HomePage() {
     
     setIsFollowUp(true);
     
-    // 先在界面上显示用户的问题
     const userQuestion = followUpText;
-    setAnalysisResult(prev => prev + '\n\n---\n\n**追问：**\n\n' + userQuestion + '\n\n**回复：**\n\n');
     setFollowUpText('');
     
     try {
@@ -249,7 +247,16 @@ export default function HomePage() {
       
       const reader = stream.getReader();
       const decoder = new TextDecoder();
-      let fullContent = '';
+      let replyContent = '';
+      
+      // 先显示追问标题
+      setAnalysisResult(prev => prev + '\n\n---\n\n**追问：**\n\n' + userQuestion + '\n\n**回复：**\n\n');
+      
+      // 添加用户问题到历史（先不加回复，等流式结束再加）
+      const newHistory = [
+        ...conversationHistory,
+        { role: 'user' as const, content: userQuestion }
+      ];
       
       while (true) {
         const { done, value } = await reader.read();
@@ -262,20 +269,19 @@ export default function HomePage() {
             try {
               const parsed = JSON.parse(data);
               if (parsed.content) {
-                fullContent += parsed.content;
-                setAnalysisResult(prev => prev + fullContent);
-                fullContent = '';
+                replyContent += parsed.content;
+                // 只追加新内容
+                setAnalysisResult(prev => prev + parsed.content);
               }
             } catch {}
           }
         }
       }
       
-      // 更新对话历史
-      setConversationHistory(prev => [
-        ...prev,
-        { role: 'user', content: userQuestion },
-        { role: 'assistant', content: fullContent || '(已回复)' }
+      // 更新对话历史（包含回复）
+      setConversationHistory([
+        ...newHistory,
+        { role: 'assistant' as const, content: replyContent }
       ]);
     } catch {
       // 用户取消不提示
