@@ -169,17 +169,15 @@ export const uploadApi = {
     });
     return response.json();
   },
-  
-  audio: async (file: File, signal?: AbortSignal) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    const response = await fetch(getApiUrl('/transcribe'), {
+};
+
+// OCR API - Batch OCR multiple images
+export const ocrApi = {
+  batch: async (imageUrls: string[], signal?: AbortSignal) => {
+    const response = await fetch(getApiUrl('/ocr'), {
       method: 'POST',
-      headers: {
-        'x-user-id': getUserId(),
-      },
-      body: formData,
+      headers: getHeaders(),
+      body: JSON.stringify({ imageUrls }),
       signal,
     });
     return response.json();

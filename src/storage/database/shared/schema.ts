@@ -45,6 +45,7 @@ export const analysisRecords = pgTable(
     // Input content
     inputText: text("input_text").notNull(), // Original input text
     inputType: varchar("input_type", { length: 20 }).notNull().default("text"), // text, image, voice
+    imageUrls: jsonb("image_urls").default([]), // Array of uploaded image URLs
     
     // AI Analysis result (stored as JSON)
     technicalPoints: jsonb("technical_points"), // Technical concept breakdown

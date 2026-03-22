@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { S3Storage } from 'coze-coding-dev-sdk';
-import { LLMClient, Config, HeaderUtils } from 'coze-coding-dev-sdk';
 
-// POST /api/upload - Upload image for OCR
+// POST /api/upload - Upload image only (no OCR)
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -26,7 +25,7 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     
-    // Upload to temporary storage
+    // Upload to permanent storage
     const storage = new S3Storage({
       endpointUrl: process.env.COZE_BUCKET_ENDPOINT_URL,
       accessKey: '',
@@ -35,57 +34,26 @@ export async function POST(request: NextRequest) {
       region: 'cn-beijing',
     });
     
-    const fileName = `temp_ocr/${Date.now()}_${file.name}`;
+    const fileName = `images/${Date.now()}_${Math.random().toString(36).slice(2)}_${file.name}`;
     const key = await storage.uploadFile({
       fileContent: buffer,
       fileName: fileName,
       contentType: file.type,
     });
     
-    // Generate temporary URL for OCR (valid for 5 minutes)
+    // Generate permanent URL for display (valid for 1 year)
     const imageUrl = await storage.generatePresignedUrl({
       key,
-      expireTime: 300,
+      expireTime: 31536000,
     });
-    
-    // Use vision model to extract text
-    const customHeaders = HeaderUtils.extractForwardHeaders(request.headers);
-    const config = new Config();
-    const client = new LLMClient(config, customHeaders);
-    
-    const messages = [
-      {
-        role: 'user' as const,
-        content: [
-          { 
-            type: 'text' as const, 
-            text: '请识别这张图片中的所有文字内容。如果是聊天截图，请按对话顺序整理出来，标注说话人和内容。只输出识别到的文字，不要添加任何解释。' 
-          },
-          {
-            type: 'image_url' as const,
-            image_url: {
-              url: imageUrl,
-              detail: 'high' as const,
-            },
-          },
-        ],
-      },
-    ];
-    
-    const response = await client.invoke(messages, {
-      model: 'doubao-seed-1-6-vision-250815',
-      temperature: 0.3,
-    });
-    
-    // Delete the temporary file after OCR
-    await storage.deleteFile({ fileKey: key });
     
     return NextResponse.json({
-      text: response.content,
-      inputType: 'image',
+      url: imageUrl,
+      key: key,
+      fileName: file.name,
     });
   } catch (error) {
-    console.error('Upload/OCR error:', error);
-    return NextResponse.json({ error: '图片识别失败，请重试' }, { status: 500 });
+    console.error('Upload error:', error);
+    return NextResponse.json({ error: '图片上传失败' }, { status: 500 });
   }
 }

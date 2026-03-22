@@ -88,9 +88,9 @@ const SYSTEM_PROMPT = `你是一位有10年经验的全栈开发工程师，现�
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { inputText, mode = 'concise', saveRecord = true, userId } = body;
+    const { inputText, imageUrls, mode = 'concise', saveRecord = true, userId } = body;
     
-    if (!inputText || inputText.trim().length === 0) {
+    if ((!inputText || inputText.trim().length === 0) && (!imageUrls || imageUrls.length === 0)) {
       return NextResponse.json({ error: '请输入内容' }, { status: 400 });
     }
     
@@ -163,7 +163,8 @@ export async function POST(request: NextRequest) {
                 .insert({
                   user_id: userId,
                   input_text: inputText,
-                  input_type: 'text',
+                  input_type: imageUrls && imageUrls.length > 0 ? 'image' : 'text',
+                  image_urls: imageUrls || [],
                   title: title,
                   mode: mode,
                   response_scripts: [fullContent],

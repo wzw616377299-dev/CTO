@@ -10,13 +10,25 @@ import {
   Copy,
   Check,
   Loader2,
-  Square
+  Square,
+  X,
+  Plus
 } from 'lucide-react';
-import { analyzeApi, uploadApi, getUserId } from '@/lib/api';
+import { analyzeApi, uploadApi, ocrApi, getUserId } from '@/lib/api';
 import Link from 'next/link';
+
+interface ImageItem {
+  id: string;
+  url: string;
+  name: string;
+  isUploading: boolean;
+}
+
+const MAX_IMAGES = 20;
 
 export default function HomePage() {
   const [inputText, setInputText] = useState('');
+  const [images, setImages] = useState<ImageItem[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isOcring, setIsOcring] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<string>('');
@@ -24,6 +36,7 @@ export default function HomePage() {
   const [isDragging, setIsDragging] = useState(false);
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const ocrAbortControllerRef = useRef<AbortController | null>(null);
 
@@ -47,15 +60,14 @@ export default function HomePage() {
       
       if (imageFiles.length > 0) {
         e.preventDefault();
-        // 依次处理所有图片，追加文本
         for (const file of imageFiles) {
-          await processImageFile(file);
+          await uploadImage(file);
         }
       }
     };
     document.addEventListener('paste', handlePaste);
     return () => document.removeEventListener('paste', handlePaste);
-  }, []);
+  }, [images]);
 
   useEffect(() => {
     const handleDragOver = (e: DragEvent) => { e.preventDefault(); setIsDragging(true); };
@@ -65,10 +77,9 @@ export default function HomePage() {
       setIsDragging(false);
       const files = e.dataTransfer?.files;
       if (files) {
-        // 处理所有拖入的图片
         for (const file of files) {
           if (file.type.startsWith('image/')) {
-            await processImageFile(file);
+            await uploadImage(file);
           }
         }
       }
@@ -81,42 +92,82 @@ export default function HomePage() {
       document.removeEventListener('dragleave', handleDragLeave);
       document.removeEventListener('drop', handleDrop);
     };
-  }, []);
+  }, [images]);
 
-  const processImageFile = async (file: File) => {
+  const uploadImage = async (file: File) => {
+    if (images.length >= MAX_IMAGES) {
+      alert(`最多支持 ${MAX_IMAGES} 张图片`);
+      return;
+    }
+
+    const tempId = `temp-${Date.now()}`;
+    
+    // 先添加一个占位项
+    setImages(prev => [...prev, { 
+      id: tempId, 
+      url: '', 
+      name: file.name,
+      isUploading: true 
+    }]);
+
     try {
-      setIsOcring(true);
-      ocrAbortControllerRef.current = new AbortController();
-      const result = await uploadApi.image(file, ocrAbortControllerRef.current.signal);
-      if (result.text) {
-        // 追加而不是替换
-        setInputText(prev => {
-          const newText = result.text;
-          return prev ? `${prev}\n\n${newText}` : newText;
-        });
-        // 滚动到底部
-        setTimeout(() => {
-          if (textareaRef.current) {
-            textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
-          }
-        }, 0);
+      const result = await uploadApi.image(file);
+      if (result.url) {
+        // 更新为真实URL
+        setImages(prev => prev.map(img => 
+          img.id === tempId 
+            ? { ...img, url: result.url, isUploading: false }
+            : img
+        ));
       }
     } catch {
-      // 用户取消不提示
-    } finally {
-      setIsOcring(false);
-      ocrAbortControllerRef.current = null;
+      // 上传失败，移除占位项
+      setImages(prev => prev.filter(img => img.id !== tempId));
+      alert('图片上传失败');
     }
   };
 
+  const removeImage = (id: string) => {
+    setImages(prev => prev.filter(img => img.id !== id));
+  };
+
   const handleAnalyze = useCallback(async () => {
-    if (!inputText.trim() || isAnalyzing) return;
+    const hasText = inputText.trim().length > 0;
+    const hasImages = images.length > 0;
+    
+    if (!hasText && !hasImages) return;
+    
     setIsAnalyzing(true);
     setAnalysisResult('');
     
     try {
+      let finalText = inputText;
+      
+      // 如果有图片，先进行OCR
+      if (hasImages) {
+        setIsOcring(true);
+        ocrAbortControllerRef.current = new AbortController();
+        
+        const imageUrls = images.filter(img => img.url).map(img => img.url);
+        const ocrResult = await ocrApi.batch(imageUrls, ocrAbortControllerRef.current.signal);
+        
+        if (ocrResult.text) {
+          finalText = finalText 
+            ? `${finalText}\n\n---\n\n${ocrResult.text}`
+            : ocrResult.text;
+        }
+        
+        setIsOcring(false);
+      }
+      
+      if (!finalText.trim()) {
+        setIsAnalyzing(false);
+        return;
+      }
+      
+      // 进行AI分析
       abortControllerRef.current = new AbortController();
-      const stream = await analyzeApi.stream(inputText, 'concise', abortControllerRef.current.signal);
+      const stream = await analyzeApi.stream(finalText, 'concise', abortControllerRef.current.signal);
       if (!stream) throw new Error('No stream');
       
       const reader = stream.getReader();
@@ -137,6 +188,9 @@ export default function HomePage() {
                 fullContent += parsed.content;
                 setAnalysisResult(fullContent);
               }
+              if (parsed.recordId) {
+                // 可以在这里保存图片URL到记录
+              }
             } catch {}
           }
         }
@@ -145,9 +199,11 @@ export default function HomePage() {
       // 用户取消不提示
     } finally {
       setIsAnalyzing(false);
+      setIsOcring(false);
       abortControllerRef.current = null;
+      ocrAbortControllerRef.current = null;
     }
-  }, [inputText, isAnalyzing]);
+  }, [inputText, images]);
 
   const handleStop = useCallback(() => {
     if (abortControllerRef.current) {
@@ -264,7 +320,6 @@ export default function HomePage() {
       }
 
       if (inList) {
-        // 继续列表项
         if (!line.startsWith('- ') && !line.match(/^\d+\.\s/)) {
           flushList();
           inList = false;
@@ -294,7 +349,6 @@ export default function HomePage() {
       flushList();
       flushQuote();
       
-      // 处理加粗
       const parts = line.split(/(\*\*[^*]+\*\*)/g);
       const renderedLine = parts.map((part, i) => {
         if (part.startsWith('**') && part.endsWith('**')) {
@@ -310,7 +364,6 @@ export default function HomePage() {
       );
     });
 
-    // 处理结尾
     flushQuote();
     flushList();
 
@@ -318,6 +371,7 @@ export default function HomePage() {
   };
 
   const isProcessing = isAnalyzing || isOcring;
+  const canAnalyze = inputText.trim().length > 0 || images.length > 0;
 
   return (
     <div className="h-screen flex flex-col bg-white">
@@ -349,11 +403,47 @@ export default function HomePage() {
           {/* Left: Input */}
           <div className="w-[380px] shrink-0 border-r border-neutral-100 flex flex-col">
             <div className="p-4 flex-1 flex flex-col min-h-0">
-              {/* Input Area */}
+              {/* Image Preview Area */}
+              {images.length > 0 && (
+                <div className="mb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-neutral-500">{images.length}/{MAX_IMAGES} 张图片</span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    {images.map((img) => (
+                      <div key={img.id} className="relative aspect-square bg-neutral-100 rounded overflow-hidden group">
+                        {img.isUploading ? (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Loader2 className="w-5 h-5 animate-spin text-neutral-400" />
+                          </div>
+                        ) : (
+                          <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
+                        )}
+                        <button
+                          onClick={() => removeImage(img.id)}
+                          className="absolute top-1 right-1 w-5 h-5 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="w-3 h-3 text-white" />
+                        </button>
+                      </div>
+                    ))}
+                    {images.length < MAX_IMAGES && (
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="aspect-square border-2 border-dashed border-neutral-200 rounded flex items-center justify-center hover:border-neutral-300 transition-colors"
+                      >
+                        <Plus className="w-5 h-5 text-neutral-400" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {/* Text Input Area */}
               <div className="flex-1 min-h-0 flex flex-col">
                 <Textarea
                   ref={textareaRef}
-                  placeholder="粘贴开发说的话...&#10;&#10;支持 Ctrl+V 粘贴多张截图"
+                  placeholder="粘贴开发说的话...&#10;&#10;支持 Ctrl+V 粘贴截图"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   className="flex-1 min-h-0 border-neutral-200 text-sm placeholder:text-neutral-400 focus:border-neutral-300 resize-none overflow-y-auto"
@@ -363,27 +453,32 @@ export default function HomePage() {
               
               {/* Toolbar */}
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-100">
-                <label className="cursor-pointer">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={async (e) => {
-                      const files = e.target.files;
-                      if (files) {
-                        for (const file of files) {
-                          await processImageFile(file);
-                        }
-                      }
-                      e.target.value = '';
-                    }}
-                  />
-                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-sm text-neutral-500 hover:text-neutral-900 hover:bg-neutral-50 transition-colors">
-                    <Image className="w-4 h-4" />
-                    <span>图片</span>
-                  </div>
-                </label>
+                <div className="flex items-center gap-2">
+                  {images.length < MAX_IMAGES && (
+                    <label className="cursor-pointer">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={async (e) => {
+                          const files = e.target.files;
+                          if (files) {
+                            for (const file of files) {
+                              await uploadImage(file);
+                            }
+                          }
+                          e.target.value = '';
+                        }}
+                      />
+                      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-sm text-neutral-500 hover:text-neutral-900 hover:bg-neutral-50 transition-colors">
+                        <Image className="w-4 h-4" />
+                        <span>图片</span>
+                      </div>
+                    </label>
+                  )}
+                </div>
                 
                 {isProcessing ? (
                   <Button
@@ -396,7 +491,7 @@ export default function HomePage() {
                 ) : (
                   <Button
                     onClick={handleAnalyze}
-                    disabled={!inputText.trim()}
+                    disabled={!canAnalyze}
                     className="bg-neutral-900 hover:bg-neutral-800 text-white rounded h-8 px-3 text-sm"
                   >
                     <ArrowUp className="w-3.5 h-3.5 mr-1" />

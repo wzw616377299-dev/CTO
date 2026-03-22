@@ -43,6 +43,7 @@ interface AnalysisRecordItem {
   id: string;
   input_text: string;
   input_type: string;
+  image_urls?: string[];
   title: string;
   mode: string;
   is_favorite: boolean;
@@ -299,6 +300,22 @@ export default function HistoryPage() {
                       : 'border-neutral-100 hover:border-neutral-200'
                   }`}
                 >
+                  {/* 图片缩略图 */}
+                  {record.image_urls && record.image_urls.length > 0 && (
+                    <div className="flex gap-1 mb-2">
+                      {record.image_urls.slice(0, 4).map((url, i) => (
+                        <div key={i} className="w-10 h-10 rounded overflow-hidden bg-neutral-100">
+                          <img src={url} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      ))}
+                      {record.image_urls.length > 4 && (
+                        <div className="w-10 h-10 rounded bg-neutral-100 flex items-center justify-center text-xs text-neutral-400">
+                          +{record.image_urls.length - 4}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-neutral-900 truncate">
@@ -379,6 +396,18 @@ export default function HistoryPage() {
                   <p className="text-xs text-neutral-400 mb-3">
                     {new Date(selectedRecord.created_at).toLocaleString('zh-CN')}
                   </p>
+                  
+                  {/* 图片展示 */}
+                  {selectedRecord.image_urls && selectedRecord.image_urls.length > 0 && (
+                    <div className="grid grid-cols-4 gap-2 mb-3">
+                      {selectedRecord.image_urls.map((url, i) => (
+                        <div key={i} className="aspect-square rounded overflow-hidden bg-neutral-100">
+                          <img src={url} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
                   <div className="bg-neutral-50 rounded p-3">
                     <p className="text-sm text-neutral-700 whitespace-pre-wrap leading-relaxed">
                       {selectedRecord.input_text}
