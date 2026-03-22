@@ -57,7 +57,6 @@ export const analyzeApi = {
         saveRecord: true,
         userId: getUserId(),
         generateReport,
-        enableSearch: true,
       }),
       signal,
     });

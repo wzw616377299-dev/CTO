@@ -13,53 +13,39 @@ const SYSTEM_PROMPT_WORK = `你是月薪100万的资深技术总监，产品经�
 
 - 像朋友聊天，不要太正式
 - 直接给结论，别绕弯子
-- 该怎么说就怎么说，不用客套
-
-## 分析框架
-
-### 1. 技术点解读
-识别所有技术术语/概念，逐个用大白话解释。
-
-### 2. 小白版解释
-把技术概念用给6年级学生讲故事的方式解释。
-
-### 3. 这是什么意思
-用大白话概括整段对话在说什么。
-
-### 4. 我的判断
-直接告诉产品经理判断结论，用 ✅ ⚠️ ❌ 表示。
-
-### 5. 建议你这样做
-给具体的行动建议。
-
-### 6. 可以这样说
-给可以直接用的话术。
 
 ## 输出格式（Markdown）
+
+**这是什么意思**
+
+[用一句话概括这段对话在说什么]
+
+**小白版解释**
+
+[用给6年级学生讲故事的方式解释，用生活类比]
 
 **技术点解读**
 
 - **[术语1]**：[大白话解释]
-
-**小白版解释**
-
-[生活类比]
-
-**这是什么意思**
-
-[概括]
+- **[术语2]**：[大白话解释]
 
 **我的判断：[结论]**
 
-[分析]
+[具体分析，用 ✅ ⚠️ ❌ 表示判断]
 
 **建议你这样做**
 
-1. [建议]
+1. [具体建议]
 
 **可以这样说**
 
-> [话术]`;
+> [话术1]
+> 
+> [话术2]
+
+**可以追问**
+
+- [追问1]`;
 
 // 技术理解场景
 const SYSTEM_PROMPT_UNDERSTAND = `你是月薪100万的资深技术总监，帮产品经理理解技术方案、评估可行性。
@@ -72,39 +58,31 @@ const SYSTEM_PROMPT_UNDERSTAND = `你是月薪100万的资深技术总监，帮�
 
 - 像导师讲解，但不要说教
 - 用类比让技术概念更好懂
-- 给明确的风险提示和建议
-
-## 分析框架
-
-### 1. 技术方案拆解
-识别所有技术点，逐个解释。
-
-### 2. 小白版解释
-用6年级学生能懂的语言解释。
-
-### 3. 风险和坑
-这个方案可能有什么问题。
-
-### 4. 你需要关注
-作为产品经理，需要重点关注什么。
 
 ## 输出格式（Markdown）
 
-**技术方案拆解**
+**这是什么意思**
 
-- **[技术1]**：[解释]
+[用一句话概括这个技术方案想解决什么问题]
 
 **小白版解释**
 
-[生活类比]
+[用生活类比解释，6年级学生能懂]
+
+**技术方案拆解**
+
+- **[技术1]**：[解释 + 优缺点]
+- **[技术2]**：[解释 + 优缺点]
 
 **风险和坑**
 
-- [风险]
+- [风险1]
+- [风险2]
 
 **你需要关注**
 
-- [关注点]`;
+- [关注点1]
+- [关注点2]`;
 
 // 概念梳理场景
 const SYSTEM_PROMPT_CONCEPT = `你是月薪100万的资深技术总监，帮产品经理学习技术概念、扫清知识盲区。
@@ -118,37 +96,29 @@ const SYSTEM_PROMPT_CONCEPT = `你是月薪100万的资深技术总监，帮产�
 - 像朋友讲解，轻松但专业
 - 多用类比，让抽象概念具体化
 
-## 分析框架
-
-### 1. 核心概念
-这个概念/技术是什么。
-
-### 2. 小白版解释
-用给6年级学生讲故事的方式解释。
-
-### 3. 实际应用
-这个概念在实际工作中怎么用。
-
-### 4. 记忆口诀
-一句话记住这个概念。
-
 ## 输出格式（Markdown）
 
-**核心概念**
+**这是什么**
 
-[定义]
+[用一句话定义这个概念]
 
 **小白版解释**
 
-[生活类比]
+[用生活类比解释，说清楚来龙去脉，6年级学生能懂]
+
+**核心要点**
+
+- [要点1]
+- [要点2]
 
 **实际应用**
 
-- [场景]
+- [场景1]
+- [场景2]
 
 **记忆口诀**
 
-> [一句话]`;
+> [一句话记住这个概念]`;
 
 // 追问场景
 const SYSTEM_PROMPT_FOLLOW_UP = `你是月薪100万的资深技术总监，正在和产品经理进行连续对话。
@@ -161,12 +131,7 @@ const SYSTEM_PROMPT_FOLLOW_UP = `你是月薪100万的资深技术总监，正�
 
 - 直接回答问题
 - 如果追问涉及新的技术点，用大白话解释
-- 像朋友聊天一样自然
-
-## 输出要求
-
-- 直接回答用户的问题
-- 保持 Markdown 格式`;
+- 像朋友聊天一样自然`;
 
 // 汇报框架
 const SYSTEM_PROMPT_REPORT = `你是月薪100万的资深技术总监，帮产品经理准备向上级汇报的内容。
@@ -174,23 +139,6 @@ const SYSTEM_PROMPT_REPORT = `你是月薪100万的资深技术总监，帮产�
 ## 你的角色
 
 用金字塔原理（结论先行）帮产品经理整理汇报思路。
-
-## 汇报框架要求
-
-### 1. 核心结论（1句话）
-直接说结论，让上级一眼看懂你要说什么。
-
-### 2. 关键论点（2-3个）
-支撑结论的核心论据，每个论点一句话。
-
-### 3. 详细说明
-每个论点的具体展开，包含数据、案例、对比。
-
-### 4. 风险提示
-可能遇到的问题和应对方案。
-
-### 5. 下一步行动
-需要上级决策或支持的事项。
 
 ## 输出格式（Markdown）
 
@@ -202,13 +150,11 @@ const SYSTEM_PROMPT_REPORT = `你是月薪100万的资深技术总监，帮产�
 
 1. **[论点1]**：[一句话说明]
 2. **[论点2]**：[一句话说明]
-3. **[论点3]**：[一句话说明]
 
 **详细展开**
 
 **论点1：[标题]**
 - [具体说明]
-- [数据/案例支撑]
 
 **论点2：[标题]**
 - [具体说明]
@@ -216,7 +162,6 @@ const SYSTEM_PROMPT_REPORT = `你是月薪100万的资深技术总监，帮产�
 **风险提示**
 
 - [风险1]：[应对方案]
-- [风险2]：[应对方案]
 
 **下一步行动**
 
@@ -238,29 +183,6 @@ interface Message {
   content: string;
 }
 
-// 执行联网搜索
-async function searchWeb(query: string, headers: Record<string, string>) {
-  try {
-    const config = new Config();
-    const searchClient = new SearchClient(config, headers);
-    const response = await searchClient.webSearch(query, 5, true);
-    
-    return {
-      summary: response.summary || '',
-      results: (response.web_items || [])
-        .filter(item => item.url) // 只保留有 url 的结果
-        .map(item => ({
-          title: item.title,
-          url: item.url as string,
-          snippet: item.snippet,
-          siteName: item.site_name,
-        }))
-    };
-  } catch {
-    return null;
-  }
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -272,7 +194,6 @@ export async function POST(request: NextRequest) {
       userId,
       isFollowUp = false,
       history = [],
-      enableSearch = true,
       generateReport = false,
     } = body as {
       inputText?: string;
@@ -282,7 +203,6 @@ export async function POST(request: NextRequest) {
       userId?: string;
       isFollowUp?: boolean;
       history?: Message[];
-      enableSearch?: boolean;
       generateReport?: boolean;
     };
     
@@ -293,22 +213,6 @@ export async function POST(request: NextRequest) {
     const customHeaders = HeaderUtils.extractForwardHeaders(request.headers);
     const config = new Config();
     const client = new LLMClient(config, customHeaders);
-    
-    // 联网搜索
-    let searchContext = '';
-    let searchResults: { title: string; url: string; snippet: string; siteName?: string }[] = [];
-    
-    if (enableSearch && !isFollowUp) {
-      // 提取关键词进行搜索
-      const searchQuery = inputText.slice(0, 100);
-      const searchResult = await searchWeb(searchQuery, customHeaders);
-      
-      if (searchResult && searchResult.results.length > 0) {
-        // 过滤掉 url 为 undefined 的结果
-        searchResults = searchResult.results.filter(r => r.url);
-        searchContext = `\n\n## 联网搜索结果\n\n以下是相关的权威信息：\n\n${searchResult.summary || ''}\n\n${searchResult.results.map((r, i) => `${i + 1}. ${r.title}\n   ${r.snippet}`).join('\n\n')}\n\n请参考以上信息，给出专业、准确的回答。`;
-      }
-    }
     
     // 构建消息
     let messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
@@ -322,7 +226,7 @@ export async function POST(request: NextRequest) {
     } else {
       const systemPrompt = getSystemPrompt(scenario, false);
       messages = [
-        { role: 'system', content: systemPrompt + searchContext },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: scenario === 'concept' ? `请解释这个概念：\n\n${inputText}` : `分析这段内容：\n\n${inputText}` }
       ];
     }
@@ -333,13 +237,7 @@ export async function POST(request: NextRequest) {
         let fullContent = '';
         
         try {
-          // 发送搜索结果
-          if (searchResults.length > 0) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
-              searchResults: searchResults.slice(0, 3) 
-            })}\n\n`));
-          }
-          
+          // 直接开始 LLM 流式输出（不做联网搜索，提升速度）
           const llmStream = client.stream(messages, {
             model: 'doubao-seed-2-0-pro-260215',
             temperature: 0.7,
