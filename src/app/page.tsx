@@ -64,6 +64,7 @@ const COLORS = {
   // 主题色
   primary: '#07C160',
   primaryLight: '#1AAD19',
+  highlight: '#FA9D3B',  // 重点内容高亮色（黄色）
 };
 
 export default function HomePage() {
@@ -457,11 +458,11 @@ export default function HomePage() {
         if (part.startsWith('`') && part.endsWith('`')) {
           return <code key={idx} style={{ backgroundColor: '#2C2C2C', color: COLORS.primary }} className="px-1.5 py-0.5 rounded text-base font-mono">{part.slice(1, -1)}</code>;
         }
-        // 处理 **加粗** - 重点内容绿色高亮
+        // 处理 **加粗** - 重点内容黄色高亮
         const boldParts = part.split(/(\*\*[^*]+\*\*)/g);
         return boldParts.map((bp, j) => {
           if (bp.startsWith('**') && bp.endsWith('**')) {
-            return <strong key={`${idx}-${j}`} style={{ color: COLORS.primaryLight }} className="font-semibold">{bp.slice(2, -2)}</strong>;
+            return <strong key={`${idx}-${j}`} style={{ color: COLORS.highlight }} className="font-semibold inline">{bp.slice(2, -2)}</strong>;
           }
           return bp;
         });
@@ -549,9 +550,9 @@ export default function HomePage() {
         elements.push(
           <ul key={key++} className="my-4 space-y-2.5">
             {items.map((item, idx) => (
-              <li key={idx} className="flex gap-3 text-base" style={{ color: '#A0A0A0' }}>
-                <span style={{ color: COLORS.primary }} className="mt-1.5">•</span>
-                <span className="flex-1">{renderInline(item)}</span>
+              <li key={idx} className="flex gap-3 text-base leading-relaxed" style={{ color: '#A0A0A0' }}>
+                <span style={{ color: COLORS.primary }} className="mt-1.5 shrink-0">•</span>
+                <span className="flex-1 leading-relaxed">{renderInline(item)}</span>
               </li>
             ))}
           </ul>
@@ -577,9 +578,9 @@ export default function HomePage() {
         elements.push(
           <ol key={key++} className="my-4 space-y-2.5">
             {items.map((item, idx) => (
-              <li key={idx} className="flex gap-3 text-base" style={{ color: '#A0A0A0' }}>
-                <span style={{ color: COLORS.primary }} className="font-mono font-medium w-6">{idx + 1}.</span>
-                <span className="flex-1">{renderInline(item)}</span>
+              <li key={idx} className="flex gap-3 text-base leading-relaxed" style={{ color: '#A0A0A0' }}>
+                <span style={{ color: COLORS.primary }} className="font-mono font-medium w-6 shrink-0">{idx + 1}.</span>
+                <span className="flex-1 leading-relaxed">{renderInline(item)}</span>
               </li>
             ))}
           </ol>
@@ -612,13 +613,13 @@ export default function HomePage() {
   const renderConversation = () => {
     const elements: React.ReactNode[] = [];
     
-    // 渲染第一次回答（使用 analysisResult 支持流式输出）
+    // 渲染第一次回答（使用 analysisResult 支持流式输出）- 第一次不需要"老陈"标签
     if (analysisResult) {
       elements.push(
         <div key="main-answer" className="mb-6">
           <div className="rounded-xl py-4 pl-0 pr-5" style={{ backgroundColor: 'rgba(20, 20, 20, 0.5)', border: '1px solid rgba(44, 44, 44, 0.5)', borderLeft: 'none' }}>
             <div className="text-base leading-relaxed">
-              {renderMarkdown(analysisResult, <span className="font-medium" style={{ color: COLORS.primary }}>老陈：</span>)}
+              {renderMarkdown(analysisResult)}
             </div>
           </div>
         </div>
