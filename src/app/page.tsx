@@ -437,8 +437,6 @@ export default function HomePage() {
       const reader = stream.getReader();
       const decoder = new TextDecoder();
       let fullContent = '';
-      let lastUpdateTime = 0;
-      const UPDATE_INTERVAL = 50; // 50ms 最小更新间隔
       
       while (true) {
         const { done, value } = await reader.read();
@@ -453,29 +451,15 @@ export default function HomePage() {
               const parsed = JSON.parse(data);
               if (parsed.content) {
                 fullContent += parsed.content;
-                
-                // 使用节流机制，确保更新间隔不小于50ms
-                const now = Date.now();
-                if (now - lastUpdateTime >= UPDATE_INTERVAL) {
-                  lastUpdateTime = now;
-                  // 使用 flushSync 确保立即渲染
-                  flushSync(() => {
-                    setAnalysisResult(fullContent);
-                  });
-                } else {
-                  // 在下一个更新周期更新
+                // 使用 flushSync 强制立即渲染，实现真正的流式输出
+                flushSync(() => {
                   setAnalysisResult(fullContent);
-                }
+                });
               }
             } catch {}
           }
         }
       }
-      
-      // 确保最后一次更新被渲染
-      flushSync(() => {
-        setAnalysisResult(fullContent);
-      });
       
       setConversationHistory([
         { role: 'user', content: finalText },
@@ -511,8 +495,6 @@ export default function HomePage() {
       const reader = stream.getReader();
       const decoder = new TextDecoder();
       let replyContent = '';
-      let lastUpdateTime = 0;
-      const UPDATE_INTERVAL = 50; // 50ms 最小更新间隔
       
       // 临时添加一个空的 assistant 消息
       setConversationHistory([...newHistory, { role: 'assistant' as const, content: '' }]);
@@ -529,21 +511,8 @@ export default function HomePage() {
               const parsed = JSON.parse(data);
               if (parsed.content) {
                 replyContent += parsed.content;
-                
-                // 使用节流机制
-                const now = Date.now();
-                if (now - lastUpdateTime >= UPDATE_INTERVAL) {
-                  lastUpdateTime = now;
-                  flushSync(() => {
-                    setConversationHistory(prev => {
-                      const newHist = [...prev];
-                      if (newHist.length > 0 && newHist[newHist.length - 1].role === 'assistant') {
-                        newHist[newHist.length - 1] = { role: 'assistant', content: replyContent };
-                      }
-                      return newHist;
-                    });
-                  });
-                } else {
+                // 使用 flushSync 强制立即渲染
+                flushSync(() => {
                   setConversationHistory(prev => {
                     const newHist = [...prev];
                     if (newHist.length > 0 && newHist[newHist.length - 1].role === 'assistant') {
@@ -551,23 +520,12 @@ export default function HomePage() {
                     }
                     return newHist;
                   });
-                }
+                });
               }
             } catch {}
           }
         }
       }
-      
-      // 确保最后一次更新被渲染
-      flushSync(() => {
-        setConversationHistory(prev => {
-          const newHist = [...prev];
-          if (newHist.length > 0 && newHist[newHist.length - 1].role === 'assistant') {
-            newHist[newHist.length - 1] = { role: 'assistant', content: replyContent };
-          }
-          return newHist;
-        });
-      });
     } catch {}
     finally { setIsFollowUp(false); abortControllerRef.current = null; }
   }, [followUpText, conversationHistory, selectedScenarios]);
