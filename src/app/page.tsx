@@ -572,16 +572,31 @@ export default function HomePage() {
     return elements;
   };
 
-  // 渲染对话历史
+  // 渲染对话历史 - 微信聊天样式
   const renderConversation = () => {
     const elements: React.ReactNode[] = [];
-    let followUpCount = 0;
+    
+    // 老陈头像
+    const avatarUrl = "https://code.coze.cn/api/sandbox/coze_coding/file/proxy?expire_time=-1&file_path=assets%2Fimage.png&nonce=7d6188c8-2876-4123-8c2f-976324f83bc9&project_id=7619721306493304872&sign=2d19c3b1974a096a5340bfd153d9b533fb181ba0d19454fda04448a02f9bf225";
     
     // 渲染第一次回答（使用 analysisResult 支持流式输出）
     if (analysisResult) {
       elements.push(
-        <div key="main-answer" className="mb-6">
-          {renderMarkdown(analysisResult)}
+        <div key="main-answer" className="flex gap-3 mb-6">
+          {/* 老陈头像 */}
+          <img 
+            src={avatarUrl}
+            alt="老陈"
+            className="w-10 h-10 rounded-lg object-cover shrink-0"
+            style={{ boxShadow: `0 0 0 2px rgba(7, 193, 96, 0.3)` }}
+          />
+          {/* 消息气泡 */}
+          <div className="flex-1 min-w-0">
+            <div className="text-xs mb-1.5" style={{ color: '#4A4A4A' }}>老陈</div>
+            <div className="rounded-2xl rounded-tl-sm p-4" style={{ backgroundColor: '#1A1A1A' }}>
+              <div className="text-base leading-relaxed">{renderMarkdown(analysisResult)}</div>
+            </div>
+          </div>
         </div>
       );
     }
@@ -592,29 +607,33 @@ export default function HomePage() {
         const msg = conversationHistory[i];
         
         if (msg.role === 'user') {
-          followUpCount++;
+          // 用户追问 - 右对齐，不带头像
           elements.push(
-            <div key={`q-${i}`} className="mt-8 mb-4">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="px-2.5 py-1 text-xs font-medium rounded-md" style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B', border: '1px solid rgba(245, 158, 11, 0.25)' }}>
-                  追问 {followUpCount}
-                </span>
-              </div>
-              <div className="rounded-lg p-4" style={{ backgroundColor: '#1A1A1A', border: '1px solid #2C2C2C' }}>
-                <p className="text-base" style={{ color: '#A0A0A0' }}>{msg.content}</p>
+            <div key={`q-${i}`} className="flex gap-3 mb-4 justify-end">
+              <div className="max-w-[85%]">
+                <div className="rounded-2xl rounded-tr-sm p-4" style={{ backgroundColor: COLORS.primary }}>
+                  <p className="text-base" style={{ color: '#000000' }}>{msg.content}</p>
+                </div>
               </div>
             </div>
           );
         } else if (msg.role === 'assistant') {
+          // 老陈回答 - 左对齐，带头像
           elements.push(
-            <div key={`a-${i}`} className="rounded-xl p-5 my-4" style={{ background: 'linear-gradient(to bottom right, rgba(7, 193, 96, 0.08), #0A0A0A)', border: '1px solid rgba(7, 193, 96, 0.2)' }}>
-              <div className="flex items-center gap-2 mb-4">
-                <span className="px-2.5 py-1 text-xs font-medium rounded-md" style={{ backgroundColor: 'rgba(7, 193, 96, 0.15)', color: COLORS.primary, border: '1px solid rgba(7, 193, 96, 0.25)' }}>
-                  回答
-                </span>
-              </div>
-              <div className="text-base leading-relaxed">
-                {renderMarkdown(msg.content)}
+            <div key={`a-${i}`} className="flex gap-3 mb-4">
+              <img 
+                src={avatarUrl}
+                alt="老陈"
+                className="w-10 h-10 rounded-lg object-cover shrink-0"
+                style={{ boxShadow: `0 0 0 2px rgba(7, 193, 96, 0.3)` }}
+              />
+              <div className="flex-1 min-w-0">
+                <div className="text-xs mb-1.5" style={{ color: '#4A4A4A' }}>老陈</div>
+                <div className="rounded-2xl rounded-tl-sm p-4" style={{ backgroundColor: '#1A1A1A' }}>
+                  <div className="text-base leading-relaxed">
+                    {renderMarkdown(msg.content)}
+                  </div>
+                </div>
               </div>
             </div>
           );
@@ -626,8 +645,21 @@ export default function HomePage() {
     if (isFollowUp && conversationHistory.length > 0 && 
         conversationHistory[conversationHistory.length - 1].role === 'user') {
       elements.push(
-        <div key="loading" className="flex items-center gap-2 text-base mt-4" style={{ color: '#666666' }}>
-          <Loader2 className="w-5 h-5 animate-spin" /><span>思考中...</span>
+        <div key="loading" className="flex gap-3 mb-4">
+          <img 
+            src={avatarUrl}
+            alt="老陈"
+            className="w-10 h-10 rounded-lg object-cover shrink-0"
+            style={{ boxShadow: `0 0 0 2px rgba(7, 193, 96, 0.3)` }}
+          />
+          <div className="flex-1 min-w-0">
+            <div className="text-xs mb-1.5" style={{ color: '#4A4A4A' }}>老陈</div>
+            <div className="rounded-2xl rounded-tl-sm px-4 py-3" style={{ backgroundColor: '#1A1A1A' }}>
+              <div className="flex items-center gap-2 text-base" style={{ color: '#666666' }}>
+                <Loader2 className="w-4 h-4 animate-spin" /><span>思考中...</span>
+              </div>
+            </div>
+          </div>
         </div>
       );
     }
@@ -662,7 +694,7 @@ export default function HomePage() {
               style={{ boxShadow: `0 0 0 2px rgba(7, 193, 96, 0.3)` }}
             />
             <div>
-              <span className="text-lg font-semibold" style={{ color: '#FFFFFF' }}>首席技术官</span>
+              <span className="text-lg font-semibold" style={{ color: '#FFFFFF' }}>首席技术官-老陈</span>
               <span className="text-xs ml-2" style={{ color: '#4A4A4A' }}>CTO</span>
             </div>
           </div>
