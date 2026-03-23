@@ -899,7 +899,7 @@ export default function HomePage() {
                     onClick={clearAll}
                     variant="ghost"
                     className="shrink-0 px-4 gap-2"
-                    style={{ color: '#666666', border: '1px solid #2C2C2C', height: '40px' }}
+                    style={{ color: '#666666', border: '1px solid #2C2C2C', height: '40px', backgroundColor: 'transparent' }}
                   >
                     <Plus className="w-4 h-4" />
                     <span className="text-sm">新会话</span>
@@ -911,8 +911,8 @@ export default function HomePage() {
                     placeholder={conversationHistory.length > 0 ? "继续追问..." : "输入问题开始分析..."} 
                     value={followUpText}
                     onChange={(e) => setFollowUpText(e.target.value)}
-                    className="flex-1 h-10 px-4 text-base rounded-lg outline-none"
-                    style={{ backgroundColor: '#141414', border: '1px solid #2C2C2C', color: '#FFFFFF' }}
+                    className="flex-1 h-10 px-4 text-sm rounded-lg outline-none"
+                    style={{ backgroundColor: 'transparent', border: '1px solid #2C2C2C', color: '#FFFFFF' }}
                     disabled={isFollowUp || isAnalyzing}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
