@@ -441,9 +441,24 @@ export default function HomePage() {
     let i = 0;
     let key = 0;
     let prefixUsed = false;
+    let currentLevel = 0; // 0=无标题, 1=一级标题, 2=二级标题, 3=三级标题
 
-    const renderInline = (text: string): React.ReactNode => {
+    const renderInline = (text: string, level: number = currentLevel): React.ReactNode => {
       if (!text) return null;
+      
+      // 根据层级决定高亮样式
+      const getBoldStyle = (lvl: number): React.CSSProperties => {
+        switch (lvl) {
+          case 1: // 一级标题下 - 黄色
+            return { color: COLORS.highlight };
+          case 2: // 二级标题下 - 白色
+            return { color: '#FFFFFF' };
+          case 3: // 三级标题下 - 白色加粗倾斜
+            return { color: '#FFFFFF', fontStyle: 'italic' };
+          default: // 默认 - 黄色
+            return { color: COLORS.highlight };
+        }
+      };
       
       // 处理行内代码 `code`
       const parts = text.split(/(`[^`]+`)/g);
@@ -451,11 +466,11 @@ export default function HomePage() {
         if (part.startsWith('`') && part.endsWith('`')) {
           return <code key={idx} style={{ backgroundColor: '#2C2C2C', color: COLORS.primary }} className="px-1.5 py-0.5 rounded text-base font-mono">{part.slice(1, -1)}</code>;
         }
-        // 处理 **加粗** - 重点内容黄色高亮
+        // 处理 **加粗** - 根据层级使用不同样式
         const boldParts = part.split(/(\*\*[^*]+\*\*)/g);
         return boldParts.map((bp, j) => {
           if (bp.startsWith('**') && bp.endsWith('**')) {
-            return <strong key={`${idx}-${j}`} style={{ color: COLORS.highlight }} className="font-semibold inline">{bp.slice(2, -2)}</strong>;
+            return <strong key={`${idx}-${j}`} style={getBoldStyle(level)} className="font-semibold inline">{bp.slice(2, -2)}</strong>;
           }
           return bp;
         });
@@ -477,6 +492,7 @@ export default function HomePage() {
       }
       
       if (line.startsWith('### ')) {
+        currentLevel = 3;
         // 如果还没使用前缀，在第一个元素前添加前缀
         if (prefix && !prefixUsed) {
           elements.push(<p key={key++} className="text-base leading-relaxed mb-2" style={{ color: '#A0A0A0' }}>{prefix}</p>);
@@ -487,6 +503,7 @@ export default function HomePage() {
         continue;
       }
       if (line.startsWith('## ')) {
+        currentLevel = 2;
         // 如果还没使用前缀，在第一个元素前添加前缀
         if (prefix && !prefixUsed) {
           elements.push(<p key={key++} className="text-base leading-relaxed mb-2" style={{ color: '#A0A0A0' }}>{prefix}</p>);
@@ -497,6 +514,7 @@ export default function HomePage() {
         continue;
       }
       if (line.startsWith('# ')) {
+        currentLevel = 1;
         // 如果还没使用前缀，在第一个元素前添加前缀
         if (prefix && !prefixUsed) {
           elements.push(<p key={key++} className="text-base leading-relaxed mb-2" style={{ color: '#A0A0A0' }}>{prefix}</p>);
