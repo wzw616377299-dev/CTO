@@ -597,26 +597,24 @@ export default function HomePage() {
           // 用户追问
           elements.push(
             <div key={`q-${i}`} className="mt-8 pt-6" style={{ borderTop: '1px solid #1A1A1A' }}>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-sm font-medium" style={{ color: '#666666' }}>追问</span>
-              </div>
-              <p className="text-base" style={{ color: '#A0A0A0' }}>{msg.content}</p>
+              <p className="text-base leading-relaxed" style={{ color: '#A0A0A0' }}>
+                <span className="font-medium" style={{ color: COLORS.primary }}>我：</span>
+                {msg.content}
+              </p>
             </div>
           );
         } else if (msg.role === 'assistant') {
           // 老陈回答
           elements.push(
             <div key={`a-${i}`} className="mt-4">
-              <div className="flex items-center gap-2 mb-3">
+              <div className="text-base leading-relaxed">
                 <img 
                   src={avatarUrl}
                   alt="老陈"
-                  className="w-6 h-6 rounded object-cover"
+                  className="w-5 h-5 rounded inline-block mr-1.5 align-middle"
                   style={{ boxShadow: `0 0 0 1px rgba(7, 193, 96, 0.3)` }}
                 />
-                <span className="text-sm font-medium" style={{ color: COLORS.primary }}>老陈</span>
-              </div>
-              <div className="text-base leading-relaxed">
+                <span className="font-medium" style={{ color: COLORS.primary }}>老陈：</span>
                 {renderMarkdown(msg.content)}
               </div>
             </div>
