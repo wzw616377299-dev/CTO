@@ -119,6 +119,44 @@ const SYSTEM_PROMPT_CONCEPT = `你是首席技术官（CTO），帮产品经理�
 
 > [一句话记住这个概念]`;
 
+// 汇报框架场景
+const SYSTEM_PROMPT_REPORT = `你是首席技术官（CTO），帮产品经理准备向上级汇报的内容。
+
+## 你的角色
+
+把技术问题或方案整理成简洁的汇报框架，让产品经理能快速向上级沟通。
+
+## 说话风格
+
+- 极度简洁，每个要点不超过一行
+- 结论先行，论据支撑
+- 适合直接复制到微信或邮件
+
+## 输出格式（Markdown）
+
+**背景**
+
+[一句话说明问题背景]
+
+**核心结论**
+
+> [一句话结论]
+
+**关键要点**
+
+1. [要点1]
+2. [要点2]
+3. [要点3]
+
+**风险提示**
+
+- [风险] → [应对]
+
+**下一步行动**
+
+- [ ] [行动项1]
+- [ ] [行动项2]`;
+
 // 追问场景
 const SYSTEM_PROMPT_FOLLOW_UP = `你是月薪100万的资深技术总监，正在和产品经理进行连续对话。
 
@@ -132,48 +170,13 @@ const SYSTEM_PROMPT_FOLLOW_UP = `你是月薪100万的资深技术总监，正�
 - 如果追问涉及新的技术点，用大白话解释
 - 像朋友聊天一样自然`;
 
-// 汇报框架
-const SYSTEM_PROMPT_REPORT = `你是首席技术官（CTO），帮产品经理准备向上级汇报的内容。
-
-## 要求
-
-- 极度简洁，每个要点不超过一行
-- 结论先行，论据支撑
-- 适合直接复制到微信或邮件
-
-## 输出格式（Markdown）
-
-**问题背景**
-
-[一句话说明背景]
-
-**核心结论**
-
-> [一句话结论]
-
-**关键论点**
-
-1. [论点1]
-2. [论点2]
-3. [论点3]
-
-**风险提示**
-
-- [风险] → [应对]
-
-**下一步**
-
-- [ ] [行动项]
-
-- [ ] [行动项1]
-- [ ] [行动项2]`;
-
 function getSystemPrompt(scenario: string, isFollowUp: boolean = false): string {
   if (isFollowUp) return SYSTEM_PROMPT_FOLLOW_UP;
   
   switch (scenario) {
     case 'understand': return SYSTEM_PROMPT_UNDERSTAND;
     case 'concept': return SYSTEM_PROMPT_CONCEPT;
+    case 'report': return SYSTEM_PROMPT_REPORT;
     default: return SYSTEM_PROMPT_WORK;
   }
 }
@@ -194,7 +197,6 @@ export async function POST(request: NextRequest) {
       userId,
       isFollowUp = false,
       history = [],
-      generateReport = false,
       title: customTitle,
     } = body as {
       inputText?: string;
@@ -204,7 +206,6 @@ export async function POST(request: NextRequest) {
       userId?: string;
       isFollowUp?: boolean;
       history?: Message[];
-      generateReport?: boolean;
       title?: string;
     };
     
@@ -250,27 +251,6 @@ export async function POST(request: NextRequest) {
               const text = chunk.content.toString();
               fullContent += text;
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: text })}\n\n`));
-            }
-          }
-          
-          // 生成汇报框架（如果需要）
-          if (generateReport && !isFollowUp) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ reportStart: true })}\n\n`));
-            
-            const reportMessages = [
-              { role: 'system' as const, content: SYSTEM_PROMPT_REPORT },
-              { role: 'user' as const, content: `用户输入：\n${inputText}\n\n生成简洁的汇报框架。` }
-            ];
-            
-            const reportStream = client.stream(reportMessages, {
-              model: 'doubao-seed-2-0-pro-260215',
-              temperature: 0.7,
-            });
-            
-            for await (const chunk of reportStream) {
-              if (chunk.content) {
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ reportContent: chunk.content.toString() })}\n\n`));
-              }
             }
           }
           

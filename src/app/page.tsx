@@ -13,7 +13,6 @@ import {
   Square,
   X,
   Plus,
-  GitBranch,
   Trash2
 } from 'lucide-react';
 import { analyzeApi, uploadApi, ocrApi, getUserId, recordsApi } from '@/lib/api';
@@ -36,6 +35,7 @@ const SCENARIOS = [
   { id: 'work', label: '企微沟通' },
   { id: 'understand', label: '技术理解' },
   { id: 'concept', label: '概念梳理' },
+  { id: 'report', label: '汇报框架' },
 ];
 
 const MAX_IMAGES = 20;
@@ -85,9 +85,6 @@ export default function HomePage() {
   const [followUpText, setFollowUpText] = useState('');
   const [isFollowUp, setIsFollowUp] = useState(false);
   const [conversationHistory, setConversationHistory] = useState<Message[]>([]);
-  
-  const [reportContent, setReportContent] = useState<string>('');
-  const [generateReport, setGenerateReport] = useState(false);
   
   const [topicTitle, setTopicTitle] = useState<string>('');
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
@@ -188,7 +185,7 @@ export default function HomePage() {
     if (!userScrolled) {
       resultsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [analysisResult, reportContent, conversationHistory, userScrolled]);
+  }, [analysisResult, conversationHistory, userScrolled]);
   
   // 监听滚动
   useEffect(() => {
@@ -276,7 +273,6 @@ export default function HomePage() {
     setImages([]);
     setAnalysisResult('');
     setConversationHistory([]);
-    setReportContent('');
     setTopicTitle('');
     setSelectedScenarios(['work', 'understand', 'concept']);
     localStorage.removeItem('cto_current_session');
@@ -290,7 +286,6 @@ export default function HomePage() {
     setIsAnalyzing(true);
     setAnalysisResult('');
     setConversationHistory([]);
-    setReportContent('');
     setTopicTitle('');
     setUserScrolled(false); // 重置滚动状态
     
@@ -332,13 +327,12 @@ export default function HomePage() {
       
       abortControllerRef.current = new AbortController();
       const scenario = selectedScenarios.join(',');
-      const stream = await analyzeApi.stream(finalText, scenario, abortControllerRef.current.signal, generateReport, title);
+      const stream = await analyzeApi.stream(finalText, scenario, abortControllerRef.current.signal, title);
       if (!stream) throw new Error('No stream');
       
       const reader = stream.getReader();
       const decoder = new TextDecoder();
       let fullContent = '';
-      let reportText = '';
       
       while (true) {
         const { done, value } = await reader.read();
@@ -351,7 +345,6 @@ export default function HomePage() {
             if (data === '[DONE]') continue;
             try {
               const parsed = JSON.parse(data);
-              if (parsed.reportContent) { reportText += parsed.reportContent; setReportContent(reportText); }
               if (parsed.content) { fullContent += parsed.content; setAnalysisResult(fullContent); }
             } catch {}
           }
@@ -369,7 +362,7 @@ export default function HomePage() {
       abortControllerRef.current = null;
       ocrAbortControllerRef.current = null;
     }
-  }, [inputText, images, selectedScenarios, generateReport]);
+  }, [inputText, images, selectedScenarios]);
 
   const handleFollowUp = useCallback(async () => {
     if (!followUpText.trim() || conversationHistory.length === 0) return;
@@ -735,88 +728,76 @@ export default function HomePage() {
                 </div>
               </div>
               
-              {/* Images */}
-              {images.length > 0 && (
-                <div className="mb-5">
-                  <div className="text-xs mb-2 uppercase tracking-wider" style={{ color: '#4A4A4A' }}>{images.length}/{MAX_IMAGES} 张图片</div>
-                  <div className="grid grid-cols-4 gap-2">
-                    {images.map((img) => (
-                      <div key={img.id} className="relative aspect-square rounded-lg overflow-hidden group" style={{ backgroundColor: '#141414', border: '1px solid #2C2C2C' }}>
-                        {img.isUploading ? (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Loader2 className="w-5 h-5 animate-spin" style={{ color: COLORS.primary }} />
-                          </div>
-                        ) : (
-                          <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
-                        )}
-                        <button 
-                          onClick={() => removeImage(img.id)} 
-                          className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
-                          style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)', border: '1px solid #3C3C3C' }}
-                        >
-                          <X className="w-3 h-4" style={{ color: '#666666' }} />
-                        </button>
-                      </div>
-                    ))}
-                    {images.length < MAX_IMAGES && (
-                      <button 
-                        onClick={() => fileInputRef.current?.click()} 
-                        className="aspect-square rounded-lg flex items-center justify-center transition-all"
-                        style={{ border: '1px dashed #2C2C2C' }}
-                      >
-                        <Plus className="w-5 h-5" style={{ color: '#3C3C3C' }} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-              
-              {/* Text Input */}
-              <div className="text-xs mb-2 uppercase tracking-wider" style={{ color: '#4A4A4A' }}>问题背景</div>
-              <Textarea 
-                ref={textareaRef} 
-                placeholder="粘贴开发说的话...&#10;&#10;支持 Ctrl+V 粘贴截图" 
-                value={inputText} 
-                onChange={(e) => setInputText(e.target.value)}
-                className="flex-1 min-h-0 text-base resize-none overflow-y-auto rounded-lg"
-                style={{ backgroundColor: '#141414', border: '1px solid #2C2C2C', color: '#FFFFFF' }}
-                disabled={isProcessing} 
-              />
-              
-              {/* 生成汇报选项 */}
-              <label className="flex items-center gap-2 mt-4 text-sm cursor-pointer transition-colors" style={{ color: '#666666' }}>
-                <input 
-                  type="checkbox" 
-                  checked={generateReport} 
-                  onChange={(e) => setGenerateReport(e.target.checked)} 
-                  className="rounded"
-                  style={{ accentColor: COLORS.primary }}
-                />
-                <GitBranch className="w-4 h-4" style={{ color: '#4A4A4A' }} />
-                生成汇报框架
-              </label>
-              
-              {/* Toolbar */}
-              <div className="flex items-center justify-between mt-5 pt-4" style={{ borderTop: '1px solid #1A1A1A' }}>
-                <div className="flex gap-2">
-                  <label className="cursor-pointer">
+              {/* 问题背景 */}
+              <div className="flex-1 flex flex-col min-h-0">
+                <div className="text-xs mb-2 uppercase tracking-wider flex items-center justify-between" style={{ color: '#4A4A4A' }}>
+                  <span>问题背景</span>
+                  <label className="cursor-pointer flex items-center gap-1.5 px-2 py-1 rounded transition-all hover:bg-[#1A1A1A]" style={{ color: '#666666' }}>
                     <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={async (e) => {
                       const files = e.target.files;
                       if (files) { for (const file of files) await uploadImage(file); }
                       e.target.value = '';
                     }} />
-                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all border border-transparent" style={{ color: '#666666' }}>
-                      <ImageIcon className="w-4 h-4" /><span>图片</span>
-                    </div>
+                    <ImageIcon className="w-3.5 h-3.5" />
+                    <span className="text-xs">补充图片</span>
                   </label>
-                  <button 
-                    onClick={clearAll} 
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all border border-transparent"
-                    style={{ color: '#4A4A4A' }}
-                  >
-                    <Trash2 className="w-4 h-4" /><span>清空</span>
-                  </button>
                 </div>
+                
+                {/* 已上传的图片 */}
+                {images.length > 0 && (
+                  <div className="mb-3">
+                    <div className="grid grid-cols-4 gap-2">
+                      {images.map((img) => (
+                        <div key={img.id} className="relative aspect-square rounded-lg overflow-hidden group" style={{ backgroundColor: '#141414', border: '1px solid #2C2C2C' }}>
+                          {img.isUploading ? (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Loader2 className="w-5 h-5 animate-spin" style={{ color: COLORS.primary }} />
+                            </div>
+                          ) : (
+                            <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
+                          )}
+                          <button 
+                            onClick={() => removeImage(img.id)} 
+                            className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+                            style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)', border: '1px solid #3C3C3C' }}
+                          >
+                            <X className="w-3 h-4" style={{ color: '#666666' }} />
+                          </button>
+                        </div>
+                      ))}
+                      {images.length < MAX_IMAGES && (
+                        <button 
+                          onClick={() => fileInputRef.current?.click()} 
+                          className="aspect-square rounded-lg flex items-center justify-center transition-all"
+                          style={{ border: '1px dashed #2C2C2C' }}
+                        >
+                          <Plus className="w-5 h-5" style={{ color: '#3C3C3C' }} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                <Textarea 
+                  ref={textareaRef} 
+                  placeholder="粘贴开发说的话...&#10;&#10;支持 Ctrl+V 粘贴截图" 
+                  value={inputText} 
+                  onChange={(e) => setInputText(e.target.value)}
+                  className="flex-1 min-h-0 text-base resize-none overflow-y-auto rounded-lg"
+                  style={{ backgroundColor: '#141414', border: '1px solid #2C2C2C', color: '#FFFFFF' }}
+                  disabled={isProcessing} 
+                />
+              </div>
+              
+              {/* Toolbar */}
+              <div className="flex items-center justify-between mt-5 pt-4" style={{ borderTop: '1px solid #1A1A1A' }}>
+                <button 
+                  onClick={clearAll} 
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all border border-transparent"
+                  style={{ color: '#4A4A4A' }}
+                >
+                  <Trash2 className="w-4 h-4" /><span>清空</span>
+                </button>
                 
                 {isProcessing ? (
                   <Button onClick={handleStop} className="rounded-lg h-10 px-5 text-base" style={{ backgroundColor: '#EF4444', color: '#FFFFFF' }}>
@@ -876,17 +857,6 @@ export default function HomePage() {
               {!isLoadingRecord && conversationHistory.length > 0 && (
                 <div className="text-base leading-relaxed">
                   {renderConversation()}
-                </div>
-              )}
-              
-              {/* 汇报框架 */}
-              {reportContent && (
-                <div className="mt-8 pt-8" style={{ borderTop: '1px solid #1A1A1A' }}>
-                  <div className="flex items-center gap-2 mb-5">
-                    <GitBranch className="w-5 h-5" style={{ color: COLORS.primary }} />
-                    <span className="text-lg font-semibold" style={{ color: '#FFFFFF' }}>向上级汇报框架</span>
-                  </div>
-                  <div className="text-base leading-relaxed">{renderMarkdown(reportContent)}</div>
                 </div>
               )}
               
