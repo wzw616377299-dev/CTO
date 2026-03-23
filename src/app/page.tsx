@@ -671,7 +671,7 @@ export default function HomePage() {
     if (analysisResult) {
       elements.push(
         <div key="main-answer" className="mb-6">
-          <div className="rounded-xl py-4 pl-0 pr-5" style={{ backgroundColor: 'rgba(20, 20, 20, 0.5)', border: '1px solid rgba(44, 44, 44, 0.5)', borderLeft: 'none' }}>
+          <div className="rounded-xl p-5" style={{ backgroundColor: 'rgba(20, 20, 20, 0.5)', border: '1px solid rgba(44, 44, 44, 0.5)' }}>
             <div className="text-base leading-relaxed">
               {renderMarkdown(analysisResult)}
             </div>
@@ -696,10 +696,10 @@ export default function HomePage() {
             </div>
           );
         } else if (msg.role === 'assistant') {
-          // 老陈回答 - 用卡片包裹，去掉左边 padding 让内容与用户消息对齐
+          // 老陈回答 - 用卡片包裹
           elements.push(
             <div key={`a-${i}`} className="mt-4">
-              <div className="rounded-xl py-4 pl-0 pr-5" style={{ backgroundColor: 'rgba(20, 20, 20, 0.5)', border: '1px solid rgba(44, 44, 44, 0.5)', borderLeft: 'none' }}>
+              <div className="rounded-xl p-5" style={{ backgroundColor: 'rgba(20, 20, 20, 0.5)', border: '1px solid rgba(44, 44, 44, 0.5)' }}>
                 <div className="text-base leading-relaxed">
                   {renderMarkdown(msg.content, <span className="font-medium" style={{ color: COLORS.primary }}>老陈：</span>)}
                 </div>
