@@ -578,7 +578,14 @@ export default function HomePage() {
     if (analysisResult) {
       elements.push(
         <div key="main-answer" className="mb-6">
-          {renderMarkdown(analysisResult)}
+          <div className="rounded-xl p-5" style={{ backgroundColor: 'rgba(20, 20, 20, 0.5)', border: '1px solid rgba(44, 44, 44, 0.5)' }}>
+            <p className="text-base leading-relaxed mb-2">
+              <span className="font-medium" style={{ color: COLORS.primary }}>老陈：</span>
+            </p>
+            <div className="text-base leading-relaxed">
+              {renderMarkdown(analysisResult)}
+            </div>
+          </div>
         </div>
       );
     }
@@ -591,20 +598,24 @@ export default function HomePage() {
         if (msg.role === 'user') {
           // 用户追问
           elements.push(
-            <div key={`q-${i}`} className="mt-8 pt-6" style={{ borderTop: '1px solid #1A1A1A' }}>
-              <p className="text-base leading-relaxed" style={{ color: '#A0A0A0' }}>
+            <div key={`q-${i}`} className="mt-8 pt-6 flex justify-center" style={{ borderTop: '1px solid #1A1A1A' }}>
+              <p className="text-base leading-relaxed text-center max-w-2xl" style={{ color: '#A0A0A0' }}>
                 <span className="font-medium" style={{ color: COLORS.primary }}>我：</span>
                 {msg.content}
               </p>
             </div>
           );
         } else if (msg.role === 'assistant') {
-          // 老陈回答
+          // 老陈回答 - 用卡片包裹
           elements.push(
             <div key={`a-${i}`} className="mt-4">
-              <div className="text-base leading-relaxed">
-                <span className="font-medium" style={{ color: COLORS.primary }}>老陈：</span>
-                {renderMarkdown(msg.content)}
+              <div className="rounded-xl p-5" style={{ backgroundColor: 'rgba(20, 20, 20, 0.5)', border: '1px solid rgba(44, 44, 44, 0.5)' }}>
+                <p className="text-base leading-relaxed mb-2">
+                  <span className="font-medium" style={{ color: COLORS.primary }}>老陈：</span>
+                </p>
+                <div className="text-base leading-relaxed">
+                  {renderMarkdown(msg.content)}
+                </div>
               </div>
             </div>
           );
@@ -850,7 +861,18 @@ export default function HomePage() {
             
             {/* 追问输入框 */}
             <div className="shrink-0 p-4" style={{ backgroundColor: '#0A0A0A', borderTop: '1px solid #1A1A1A' }}>
-              <div className="flex gap-3">
+              <div className="flex gap-3 items-center">
+                {conversationHistory.length > 0 && (
+                  <Button 
+                    onClick={clearAll}
+                    variant="ghost"
+                    className="shrink-0 h-[52px] px-4 gap-2"
+                    style={{ color: '#666666', border: '1px solid #2C2C2C' }}
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span className="text-sm">新会话</span>
+                  </Button>
+                )}
                 <Textarea 
                   placeholder={conversationHistory.length > 0 ? "继续追问..." : "输入问题开始分析..."} 
                   value={followUpText}
