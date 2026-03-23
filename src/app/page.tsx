@@ -607,16 +607,10 @@ export default function HomePage() {
           // 老陈回答
           elements.push(
             <div key={`a-${i}`} className="mt-4">
-              <div className="text-base leading-relaxed">
-                <img 
-                  src={avatarUrl}
-                  alt="老陈"
-                  className="w-5 h-5 rounded inline-block mr-1.5 align-middle"
-                  style={{ boxShadow: `0 0 0 1px rgba(7, 193, 96, 0.3)` }}
-                />
+              <p className="text-base leading-relaxed" style={{ color: '#A0A0A0' }}>
                 <span className="font-medium" style={{ color: COLORS.primary }}>老陈：</span>
-                {renderMarkdown(msg.content)}
-              </div>
+                {msg.content}
+              </p>
             </div>
           );
         }
