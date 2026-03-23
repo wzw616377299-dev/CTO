@@ -579,10 +579,8 @@ export default function HomePage() {
       elements.push(
         <div key="main-answer" className="mb-6">
           <div className="rounded-xl p-5" style={{ backgroundColor: 'rgba(20, 20, 20, 0.5)', border: '1px solid rgba(44, 44, 44, 0.5)' }}>
-            <p className="text-base leading-relaxed mb-2">
-              <span className="font-medium" style={{ color: COLORS.primary }}>老陈：</span>
-            </p>
             <div className="text-base leading-relaxed">
+              <span className="font-medium" style={{ color: COLORS.primary }}>老陈：</span>
               {renderMarkdown(analysisResult)}
             </div>
           </div>
@@ -598,8 +596,8 @@ export default function HomePage() {
         if (msg.role === 'user') {
           // 用户追问
           elements.push(
-            <div key={`q-${i}`} className="mt-8 pt-6 flex justify-center" style={{ borderTop: '1px solid #1A1A1A' }}>
-              <p className="text-base leading-relaxed text-center max-w-2xl" style={{ color: '#A0A0A0' }}>
+            <div key={`q-${i}`} className="mt-8 pt-6" style={{ borderTop: '1px solid #1A1A1A' }}>
+              <p className="text-base leading-relaxed" style={{ color: '#A0A0A0' }}>
                 <span className="font-medium" style={{ color: COLORS.primary }}>我：</span>
                 {msg.content}
               </p>
@@ -610,10 +608,8 @@ export default function HomePage() {
           elements.push(
             <div key={`a-${i}`} className="mt-4">
               <div className="rounded-xl p-5" style={{ backgroundColor: 'rgba(20, 20, 20, 0.5)', border: '1px solid rgba(44, 44, 44, 0.5)' }}>
-                <p className="text-base leading-relaxed mb-2">
-                  <span className="font-medium" style={{ color: COLORS.primary }}>老陈：</span>
-                </p>
                 <div className="text-base leading-relaxed">
+                  <span className="font-medium" style={{ color: COLORS.primary }}>老陈：</span>
                   {renderMarkdown(msg.content)}
                 </div>
               </div>
