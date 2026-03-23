@@ -19,6 +19,36 @@ import {
 import { analyzeApi, uploadApi, ocrApi, getUserId, recordsApi } from '@/lib/api';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
+import mermaid from 'mermaid';
+
+// 初始化 Mermaid 配置
+if (typeof window !== 'undefined') {
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'dark',
+    themeVariables: {
+      primaryColor: '#07C160',
+      primaryTextColor: '#FFFFFF',
+      primaryBorderColor: '#2C2C2C',
+      lineColor: '#3C3C3C',
+      secondaryColor: '#1A1A1A',
+      tertiaryColor: '#141414',
+      background: '#141414',
+      mainBkg: '#1A1A1A',
+      nodeBorder: '#3C3C3C',
+      clusterBkg: '#1A1A1A',
+      titleColor: '#FFFFFF',
+      edgeLabelBackground: '#1A1A1A',
+    },
+    flowchart: {
+      curve: 'basis',
+      padding: 15,
+    },
+    mindmap: {
+      padding: 15,
+    },
+  });
+}
 
 interface ImageItem {
   id: string;
@@ -66,6 +96,48 @@ const COLORS = {
   primary: '#07C160',
   primaryLight: '#1AAD19',
   highlight: '#FA9D3B',  // 重点内容高亮色（黄色）
+};
+
+// Mermaid 图表渲染组件
+const MermaidDiagram = ({ code }: { code: string }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [svg, setSvg] = useState<string>('');
+  const [error, setError] = useState<string>('');
+
+  useEffect(() => {
+    const renderDiagram = async () => {
+      try {
+        const id = `mermaid-${Date.now()}`;
+        const { svg } = await mermaid.render(id, code);
+        setSvg(svg);
+        setError('');
+      } catch (err) {
+        console.error('Mermaid render error:', err);
+        setError('图表渲染失败');
+      }
+    };
+    
+    if (code) {
+      renderDiagram();
+    }
+  }, [code]);
+
+  if (error) {
+    return (
+      <div className="my-4 p-4 rounded-lg" style={{ backgroundColor: '#1A1A1A', border: '1px solid #2C2C2C' }}>
+        <p className="text-sm" style={{ color: '#666666' }}>{error}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      ref={containerRef}
+      className="my-4 p-4 rounded-lg overflow-x-auto"
+      style={{ backgroundColor: '#1A1A1A', border: '1px solid #2C2C2C' }}
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  );
 };
 
 export default function HomePage() {
@@ -544,6 +616,52 @@ export default function HomePage() {
         continue;
       }
       
+      // 处理 mermaid 代码块
+      if (line.trim() === '```mermaid') {
+        const codeLines: string[] = [];
+        i++; // 跳过 ```mermaid 行
+        while (i < lines.length && lines[i].trim() !== '```') {
+          codeLines.push(lines[i]);
+          i++;
+        }
+        i++; // 跳过 ``` 行
+        
+        if (prefix && !prefixUsed) {
+          elements.push(<p key={key++} className="text-base leading-relaxed mb-2" style={{ color: '#A0A0A0' }}>{prefix}</p>);
+          prefixUsed = true;
+        }
+        
+        const mermaidCode = codeLines.join('\n');
+        elements.push(
+          <MermaidDiagram key={key++} code={mermaidCode} />
+        );
+        continue;
+      }
+      
+      // 处理普通代码块
+      if (line.trim().startsWith('```') && line.trim() !== '```mermaid') {
+        const lang = line.trim().slice(3);
+        const codeLines: string[] = [];
+        i++; // 跳过 ```lang 行
+        while (i < lines.length && lines[i].trim() !== '```') {
+          codeLines.push(lines[i]);
+          i++;
+        }
+        i++; // 跳过 ``` 行
+        
+        if (prefix && !prefixUsed) {
+          elements.push(<p key={key++} className="text-base leading-relaxed mb-2" style={{ color: '#A0A0A0' }}>{prefix}</p>);
+          prefixUsed = true;
+        }
+        
+        elements.push(
+          <pre key={key++} className="my-4 p-4 rounded-lg overflow-x-auto" style={{ backgroundColor: '#1A1A1A', border: '1px solid #2C2C2C' }}>
+            <code className="text-sm font-mono" style={{ color: '#A0A0A0' }}>{codeLines.join('\n')}</code>
+          </pre>
+        );
+        continue;
+      }
+      
       if (line.startsWith('### ')) {
         if (prefix && !prefixUsed) {
           elements.push(<p key={key++} className="text-base leading-relaxed mb-2" style={{ color: '#A0A0A0' }}>{prefix}</p>);
@@ -767,7 +885,7 @@ export default function HomePage() {
       <main className="flex-1 flex overflow-hidden justify-center">
         <div className="w-full max-w-[1440px] flex">
           {/* Left: Input */}
-          <div className="w-[420px] shrink-0 flex flex-col" style={{ backgroundColor: '#0A0A0A', borderRight: '1px solid #1A1A1A' }}>
+          <div className="w-[420px] shrink-0 flex flex-col" style={{ backgroundColor: '#121212', borderRight: '1px solid #1A1A1A' }}>
             <div className="p-5 flex-1 flex flex-col min-h-0">
               {/* Scenario - 多选 */}
               <div className="mb-5">
