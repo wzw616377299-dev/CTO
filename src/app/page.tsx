@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, Suspense } from 'react';
 import { flushSync } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -167,7 +167,7 @@ const MermaidDiagram = React.memo(({ code }: { code: string }) => {
 
 MermaidDiagram.displayName = 'MermaidDiagram';
 
-export default function HomePage() {
+function HomeContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const recordId = searchParams.get('recordId');
@@ -1134,5 +1134,26 @@ export default function HomePage() {
         </div>
       </main>
     </div>
+  );
+}
+
+// 加载状态组件
+function LoadingFallback() {
+  return (
+    <div className="h-screen flex items-center justify-center" style={{ backgroundColor: '#000000' }}>
+      <div className="flex flex-col items-center gap-4">
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#07C160' }} />
+        <p style={{ color: '#666666' }}>加载中...</p>
+      </div>
+    </div>
+  );
+}
+
+// 导出带有 Suspense 边界的页面组件
+export default function HomePage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <HomeContent />
+    </Suspense>
   );
 }
