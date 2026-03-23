@@ -771,6 +771,7 @@ export default function HomePage() {
               )}
               
               {/* Text Input */}
+              <div className="text-xs mb-2 uppercase tracking-wider" style={{ color: '#4A4A4A' }}>问题背景</div>
               <Textarea 
                 ref={textareaRef} 
                 placeholder="粘贴开发说的话...&#10;&#10;支持 Ctrl+V 粘贴截图" 
