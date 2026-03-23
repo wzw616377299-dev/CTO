@@ -439,13 +439,14 @@ export default function HomePage() {
   };
 
   // Markdown 渲染
-  const renderMarkdown = (content: string): React.ReactNode => {
+  const renderMarkdown = (content: string, prefix?: React.ReactNode): React.ReactNode => {
     if (!content) return null;
     
     const lines = content.split('\n');
     const elements: React.ReactNode[] = [];
     let i = 0;
     let key = 0;
+    let prefixUsed = false;
 
     const renderInline = (text: string): React.ReactNode => {
       if (!text) return null;
@@ -482,16 +483,31 @@ export default function HomePage() {
       }
       
       if (line.startsWith('### ')) {
+        // 如果还没使用前缀，在第一个元素前添加前缀
+        if (prefix && !prefixUsed) {
+          elements.push(<p key={key++} className="text-base leading-relaxed mb-2" style={{ color: '#A0A0A0' }}>{prefix}</p>);
+          prefixUsed = true;
+        }
         elements.push(<h4 key={key++} className="text-lg font-semibold mt-6 mb-3 flex items-center gap-2" style={{ color: '#E5E5E5' }}><span style={{ backgroundColor: COLORS.primary }} className="w-1 h-5 rounded-full"></span>{renderInline(line.slice(4))}</h4>);
         i++;
         continue;
       }
       if (line.startsWith('## ')) {
+        // 如果还没使用前缀，在第一个元素前添加前缀
+        if (prefix && !prefixUsed) {
+          elements.push(<p key={key++} className="text-base leading-relaxed mb-2" style={{ color: '#A0A0A0' }}>{prefix}</p>);
+          prefixUsed = true;
+        }
         elements.push(<h3 key={key++} className="text-xl font-semibold mt-8 mb-3 flex items-center gap-2" style={{ color: '#FFFFFF' }}><span style={{ backgroundColor: COLORS.primary }} className="w-1.5 h-6 rounded-full"></span>{renderInline(line.slice(3))}</h3>);
         i++;
         continue;
       }
       if (line.startsWith('# ')) {
+        // 如果还没使用前缀，在第一个元素前添加前缀
+        if (prefix && !prefixUsed) {
+          elements.push(<p key={key++} className="text-base leading-relaxed mb-2" style={{ color: '#A0A0A0' }}>{prefix}</p>);
+          prefixUsed = true;
+        }
         elements.push(<h2 key={key++} className="text-2xl font-bold mt-10 mb-4 flex items-center gap-2" style={{ color: '#FFFFFF' }}><span style={{ backgroundColor: COLORS.primary }} className="w-2 h-7 rounded-full"></span>{renderInline(line.slice(2))}</h2>);
         i++;
         continue;
@@ -502,6 +518,11 @@ export default function HomePage() {
         while (i < lines.length && lines[i].startsWith('> ')) {
           quoteLines.push(lines[i].slice(2));
           i++;
+        }
+        // 如果还没使用前缀，在第一个元素前添加前缀
+        if (prefix && !prefixUsed) {
+          elements.push(<p key={key++} className="text-base leading-relaxed mb-2" style={{ color: '#A0A0A0' }}>{prefix}</p>);
+          prefixUsed = true;
         }
         elements.push(
           <div key={key++} style={{ borderColor: COLORS.primary, backgroundColor: 'rgba(7, 193, 96, 0.05)' }} className="border-l-2 pl-4 py-3 my-4 rounded-r-lg group relative">
@@ -519,6 +540,11 @@ export default function HomePage() {
         while (i < lines.length && lines[i].startsWith('- ')) {
           items.push(lines[i].slice(2));
           i++;
+        }
+        // 如果还没使用前缀，在第一个元素前添加前缀
+        if (prefix && !prefixUsed) {
+          elements.push(<p key={key++} className="text-base leading-relaxed mb-2" style={{ color: '#A0A0A0' }}>{prefix}</p>);
+          prefixUsed = true;
         }
         elements.push(
           <ul key={key++} className="my-4 space-y-2.5">
@@ -543,6 +569,11 @@ export default function HomePage() {
             i++;
           } else break;
         }
+        // 如果还没使用前缀，在第一个元素前添加前缀
+        if (prefix && !prefixUsed) {
+          elements.push(<p key={key++} className="text-base leading-relaxed mb-2" style={{ color: '#A0A0A0' }}>{prefix}</p>);
+          prefixUsed = true;
+        }
         elements.push(
           <ol key={key++} className="my-4 space-y-2.5">
             {items.map((item, idx) => (
@@ -556,11 +587,21 @@ export default function HomePage() {
         continue;
       }
       
-      elements.push(
-        <p key={key++} className="text-base leading-relaxed my-2" style={{ color: '#A0A0A0' }}>
-          {renderInline(line)}
-        </p>
-      );
+      // 普通段落 - 如果还没使用前缀，将前缀放在开头
+      if (!prefixUsed && prefix) {
+        elements.push(
+          <p key={key++} className="text-base leading-relaxed my-2" style={{ color: '#A0A0A0' }}>
+            {prefix}{renderInline(line)}
+          </p>
+        );
+        prefixUsed = true;
+      } else {
+        elements.push(
+          <p key={key++} className="text-base leading-relaxed my-2" style={{ color: '#A0A0A0' }}>
+            {renderInline(line)}
+          </p>
+        );
+      }
       i++;
     }
 
@@ -571,17 +612,13 @@ export default function HomePage() {
   const renderConversation = () => {
     const elements: React.ReactNode[] = [];
     
-    // 老陈头像
-    const avatarUrl = "https://code.coze.cn/api/sandbox/coze_coding/file/proxy?expire_time=-1&file_path=assets%2Fimage.png&nonce=7d6188c8-2876-4123-8c2f-976324f83bc9&project_id=7619721306493304872&sign=2d19c3b1974a096a5340bfd153d9b533fb181ba0d19454fda04448a02f9bf225";
-    
     // 渲染第一次回答（使用 analysisResult 支持流式输出）
     if (analysisResult) {
       elements.push(
         <div key="main-answer" className="mb-6">
-          <div className="rounded-xl p-5" style={{ backgroundColor: 'rgba(20, 20, 20, 0.5)', border: '1px solid rgba(44, 44, 44, 0.5)' }}>
+          <div className="rounded-xl py-4 pl-0 pr-5" style={{ backgroundColor: 'rgba(20, 20, 20, 0.5)', border: '1px solid rgba(44, 44, 44, 0.5)', borderLeft: 'none' }}>
             <div className="text-base leading-relaxed">
-              <span className="font-medium" style={{ color: COLORS.primary }}>老陈：</span>
-              {renderMarkdown(analysisResult)}
+              {renderMarkdown(analysisResult, <span className="font-medium" style={{ color: COLORS.primary }}>老陈：</span>)}
             </div>
           </div>
         </div>
@@ -604,13 +641,12 @@ export default function HomePage() {
             </div>
           );
         } else if (msg.role === 'assistant') {
-          // 老陈回答 - 用卡片包裹
+          // 老陈回答 - 用卡片包裹，去掉左边 padding 让内容与用户消息对齐
           elements.push(
             <div key={`a-${i}`} className="mt-4">
-              <div className="rounded-xl p-5" style={{ backgroundColor: 'rgba(20, 20, 20, 0.5)', border: '1px solid rgba(44, 44, 44, 0.5)' }}>
+              <div className="rounded-xl py-4 pl-0 pr-5" style={{ backgroundColor: 'rgba(20, 20, 20, 0.5)', border: '1px solid rgba(44, 44, 44, 0.5)', borderLeft: 'none' }}>
                 <div className="text-base leading-relaxed">
-                  <span className="font-medium" style={{ color: COLORS.primary }}>老陈：</span>
-                  {renderMarkdown(msg.content)}
+                  {renderMarkdown(msg.content, <span className="font-medium" style={{ color: COLORS.primary }}>老陈：</span>)}
                 </div>
               </div>
             </div>
