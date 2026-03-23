@@ -173,7 +173,7 @@ export default function HomePage() {
     if (!userScrolled) {
       resultsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [analysisResult, reportContent, userScrolled]);
+  }, [analysisResult, reportContent, conversationHistory, userScrolled]);
   
   // 监听滚动
   useEffect(() => {
@@ -369,18 +369,22 @@ export default function HomePage() {
     const userQuestion = followUpText;
     setFollowUpText('');
     
+    // 先添加用户问题到历史
+    const newHistory = [...conversationHistory, { role: 'user' as const, content: userQuestion }];
+    setConversationHistory(newHistory);
+    
     try {
       abortControllerRef.current = new AbortController();
       const scenario = selectedScenarios.join(',');
-      const stream = await analyzeApi.followUp(conversationHistory, userQuestion, scenario, abortControllerRef.current.signal);
+      const stream = await analyzeApi.followUp(newHistory, userQuestion, scenario, abortControllerRef.current.signal);
       if (!stream) throw new Error('No stream');
       
       const reader = stream.getReader();
       const decoder = new TextDecoder();
       let replyContent = '';
       
-      setAnalysisResult(prev => prev + '\n\n---\n\n**追问：** ' + userQuestion + '\n\n');
-      const newHistory = [...conversationHistory, { role: 'user' as const, content: userQuestion }];
+      // 临时添加一个空的 assistant 消息
+      setConversationHistory([...newHistory, { role: 'assistant' as const, content: '' }]);
       
       while (true) {
         const { done, value } = await reader.read();
@@ -392,12 +396,21 @@ export default function HomePage() {
             if (data === '[DONE]') continue;
             try {
               const parsed = JSON.parse(data);
-              if (parsed.content) { replyContent += parsed.content; setAnalysisResult(prev => prev + parsed.content); }
+              if (parsed.content) {
+                replyContent += parsed.content;
+                // 更新最后一个 assistant 消息
+                setConversationHistory(prev => {
+                  const newHist = [...prev];
+                  if (newHist.length > 0 && newHist[newHist.length - 1].role === 'assistant') {
+                    newHist[newHist.length - 1] = { role: 'assistant', content: replyContent };
+                  }
+                  return newHist;
+                });
+              }
             } catch {}
           }
         }
       }
-      setConversationHistory([...newHistory, { role: 'assistant' as const, content: replyContent }]);
     } catch {}
     finally { setIsFollowUp(false); abortControllerRef.current = null; }
   }, [followUpText, conversationHistory, selectedScenarios]);
@@ -542,6 +555,69 @@ export default function HomePage() {
       i++;
     }
 
+    return elements;
+  };
+
+  // 渲染对话历史
+  const renderConversation = () => {
+    const elements: React.ReactNode[] = [];
+    let followUpCount = 0;
+    
+    // 渲染第一次回答（使用 analysisResult 支持流式输出）
+    if (analysisResult) {
+      elements.push(
+        <div key="main-answer" className="mb-6">
+          {renderMarkdown(analysisResult)}
+        </div>
+      );
+    }
+    
+    // 渲染追问和回答（从对话历史中跳过前两条）
+    if (conversationHistory.length > 2) {
+      for (let i = 2; i < conversationHistory.length; i++) {
+        const msg = conversationHistory[i];
+        
+        if (msg.role === 'user') {
+          followUpCount++;
+          elements.push(
+            <div key={`q-${i}`} className="mt-8 mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="px-2.5 py-1 text-xs font-medium bg-amber-500/15 text-amber-400 rounded-md border border-amber-500/25">
+                  追问 {followUpCount}
+                </span>
+              </div>
+              <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-4">
+                <p className="text-slate-300 text-base">{msg.content}</p>
+              </div>
+            </div>
+          );
+        } else if (msg.role === 'assistant') {
+          elements.push(
+            <div key={`a-${i}`} className="bg-gradient-to-br from-cyan-500/5 to-slate-900/50 border border-cyan-500/20 rounded-xl p-5 my-4">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="px-2.5 py-1 text-xs font-medium bg-cyan-500/15 text-cyan-400 rounded-md border border-cyan-500/25">
+                  回答
+                </span>
+              </div>
+              <div className="text-base leading-relaxed">
+                {renderMarkdown(msg.content)}
+              </div>
+            </div>
+          );
+        }
+      }
+    }
+    
+    // 如果正在追问，显示加载状态
+    if (isFollowUp && conversationHistory.length > 0 && 
+        conversationHistory[conversationHistory.length - 1].role === 'user') {
+      elements.push(
+        <div key="loading" className="flex items-center gap-2 text-slate-500 text-base mt-4">
+          <Loader2 className="w-5 h-5 animate-spin" /><span>思考中...</span>
+        </div>
+      );
+    }
+    
     return elements;
   };
 
@@ -728,13 +804,13 @@ export default function HomePage() {
                 </div>
               )}
 
-              {!isLoadingRecord && (isAnalyzing || isFollowUp) && !analysisResult && (
+              {!isLoadingRecord && (isAnalyzing || isFollowUp) && conversationHistory.length === 0 && (
                 <div className="flex items-center gap-2 text-slate-500 text-base">
                   <Loader2 className="w-5 h-5 animate-spin" /><span>分析中...</span>
                 </div>
               )}
 
-              {!isLoadingRecord && !isProcessing && !analysisResult && !topicTitle && (
+              {!isLoadingRecord && !isProcessing && conversationHistory.length === 0 && !topicTitle && (
                 <div className="flex flex-col items-center justify-center h-full text-slate-600">
                   <div className="w-20 h-20 bg-slate-900/50 rounded-2xl flex items-center justify-center mb-5 border border-slate-800">
                     <ArrowUp className="w-10 h-10 text-slate-700" />
@@ -744,8 +820,11 @@ export default function HomePage() {
                 </div>
               )}
 
-              {!isLoadingRecord && analysisResult && (
-                <div className="text-base leading-relaxed">{renderMarkdown(analysisResult)}</div>
+              {/* 主要内容和对话历史 */}
+              {!isLoadingRecord && conversationHistory.length > 0 && (
+                <div className="text-base leading-relaxed">
+                  {renderConversation()}
+                </div>
               )}
               
               {/* 汇报框架 */}
