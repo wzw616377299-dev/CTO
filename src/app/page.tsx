@@ -543,9 +543,9 @@ export default function HomePage() {
         elements.push(
           <ul key={key++} className="my-4 space-y-2.5">
             {items.map((item, idx) => (
-              <li key={idx} className="flex gap-3 text-base leading-relaxed" style={{ color: '#A0A0A0' }}>
-                <span style={{ color: COLORS.primary }} className="mt-1.5 shrink-0">•</span>
-                <span className="flex-1 leading-relaxed">{renderInline(item)}</span>
+              <li key={idx} className="flex gap-3" style={{ color: '#A0A0A0' }}>
+                <span style={{ color: COLORS.primary }} className="shrink-0 text-base leading-normal">•</span>
+                <span className="flex-1 text-base leading-normal">{renderInline(item)}</span>
               </li>
             ))}
           </ul>
@@ -571,9 +571,9 @@ export default function HomePage() {
         elements.push(
           <ol key={key++} className="my-4 space-y-2.5">
             {items.map((item, idx) => (
-              <li key={idx} className="flex gap-3 text-base leading-relaxed" style={{ color: '#A0A0A0' }}>
-                <span style={{ color: COLORS.primary }} className="font-mono font-medium w-6 shrink-0">{idx + 1}.</span>
-                <span className="flex-1 leading-relaxed">{renderInline(item)}</span>
+              <li key={idx} className="flex gap-3" style={{ color: '#A0A0A0' }}>
+                <span style={{ color: COLORS.primary }} className="font-mono font-medium w-6 shrink-0 text-base leading-normal">{idx + 1}.</span>
+                <span className="flex-1 text-base leading-normal">{renderInline(item)}</span>
               </li>
             ))}
           </ol>
@@ -711,12 +711,12 @@ export default function HomePage() {
               {/* Scenario - 多选 */}
               <div className="mb-5">
                 <div className="text-xs mb-2 uppercase tracking-wider" style={{ color: '#4A4A4A' }}>场景选择</div>
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex gap-2">
                   {SCENARIOS.map((s) => (
                     <button 
                       key={s.id} 
                       onClick={() => toggleScenario(s.id)}
-                      className="px-4 py-2 text-sm rounded-lg transition-all"
+                      className="flex-1 py-2 text-sm rounded-lg transition-all"
                       style={selectedScenarios.includes(s.id) 
                         ? { backgroundColor: 'rgba(7, 193, 96, 0.1)', color: COLORS.primary, border: '1px solid rgba(7, 193, 96, 0.5)', boxShadow: '0 0 10px rgba(7, 193, 96, 0.1)' }
                         : { backgroundColor: '#141414', color: '#666666', border: '1px solid #2C2C2C' }
