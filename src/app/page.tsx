@@ -19,46 +19,6 @@ import {
 import { analyzeApi, uploadApi, ocrApi, getUserId, recordsApi } from '@/lib/api';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import mermaid from 'mermaid';
-
-// 初始化 Mermaid 配置 - 只在客户端执行一次
-let mermaidInitialized = false;
-const initMermaid = () => {
-  if (typeof window !== 'undefined' && !mermaidInitialized) {
-    mermaidInitialized = true;
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: 'dark',
-      themeVariables: {
-        primaryColor: '#07C160',
-        primaryTextColor: '#FFFFFF',
-        primaryBorderColor: '#2C2C2C',
-        lineColor: '#3C3C3C',
-        secondaryColor: '#1A1A1A',
-        tertiaryColor: '#141414',
-        background: '#141414',
-        mainBkg: '#1A1A1A',
-        nodeBorder: '#3C3C3C',
-        clusterBkg: '#1A1A1A',
-        titleColor: '#FFFFFF',
-        edgeLabelBackground: '#1A1A1A',
-      },
-      flowchart: {
-        curve: 'basis',
-        padding: 15,
-        useMaxWidth: true,
-      },
-      mindmap: {
-        padding: 15,
-        useMaxWidth: true,
-      },
-      sequence: {
-        useMaxWidth: true,
-      },
-      securityLevel: 'loose',
-    });
-  }
-};
 
 interface ImageItem {
   id: string;
@@ -108,29 +68,65 @@ const COLORS = {
   highlight: '#FA9D3B',  // 重点内容高亮色（黄色）
 };
 
-// Mermaid 图表渲染组件 - 使用 React.memo 优化
+// Mermaid 图表渲染组件 - 使用动态导入避免 SSR 问题
 const MermaidDiagram = React.memo(({ code }: { code: string }) => {
   const [svg, setSvg] = useState<string>('');
   const [error, setError] = useState<string>('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
     
     const renderDiagram = async () => {
       try {
-        // 确保初始化
-        initMermaid();
+        setLoading(true);
+        
+        // 动态导入 mermaid
+        const mermaid = (await import('mermaid')).default;
+        
+        // 初始化配置
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: 'dark',
+          themeVariables: {
+            primaryColor: '#07C160',
+            primaryTextColor: '#FFFFFF',
+            primaryBorderColor: '#2C2C2C',
+            lineColor: '#3C3C3C',
+            secondaryColor: '#1A1A1A',
+            tertiaryColor: '#141414',
+            background: '#141414',
+            mainBkg: '#1A1A1A',
+            nodeBorder: '#3C3C3C',
+            clusterBkg: '#1A1A1A',
+            titleColor: '#FFFFFF',
+            edgeLabelBackground: '#1A1A1A',
+          },
+          flowchart: { curve: 'basis', padding: 15, useMaxWidth: true },
+          mindmap: { padding: 15, useMaxWidth: true },
+          sequence: { useMaxWidth: true },
+          securityLevel: 'loose',
+        });
+        
+        // 清理代码，移除可能导致错误的特殊字符
+        let cleanedCode = code
+          .replace(/subgraph\s+([^\[]+)\s*\[/g, 'subgraph $1[')  // 清理 subgraph 名称
+          .replace(/subgraph\s+([^\["\s]+)\s/g, 'subgraph $1 ')  // 确保正确格式
+          .replace(/[（）/]/g, match => match === '（' ? '(' : match === '）' ? ')' : ''); // 替换中文括号
         
         const id = `mermaid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        const { svg } = await mermaid.render(id, code);
+        const { svg } = await mermaid.render(id, cleanedCode);
+        
         if (mounted) {
           setSvg(svg);
           setError('');
+          setLoading(false);
         }
       } catch (err) {
         console.error('Mermaid render error:', err);
         if (mounted) {
-          setError('图表渲染失败，请检查语法');
+          setError('图表渲染失败');
+          setLoading(false);
         }
       }
     };
