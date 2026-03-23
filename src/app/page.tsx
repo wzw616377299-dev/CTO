@@ -21,34 +21,44 @@ import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import mermaid from 'mermaid';
 
-// 初始化 Mermaid 配置
-if (typeof window !== 'undefined') {
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: 'dark',
-    themeVariables: {
-      primaryColor: '#07C160',
-      primaryTextColor: '#FFFFFF',
-      primaryBorderColor: '#2C2C2C',
-      lineColor: '#3C3C3C',
-      secondaryColor: '#1A1A1A',
-      tertiaryColor: '#141414',
-      background: '#141414',
-      mainBkg: '#1A1A1A',
-      nodeBorder: '#3C3C3C',
-      clusterBkg: '#1A1A1A',
-      titleColor: '#FFFFFF',
-      edgeLabelBackground: '#1A1A1A',
-    },
-    flowchart: {
-      curve: 'basis',
-      padding: 15,
-    },
-    mindmap: {
-      padding: 15,
-    },
-  });
-}
+// 初始化 Mermaid 配置 - 只在客户端执行一次
+let mermaidInitialized = false;
+const initMermaid = () => {
+  if (typeof window !== 'undefined' && !mermaidInitialized) {
+    mermaidInitialized = true;
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'dark',
+      themeVariables: {
+        primaryColor: '#07C160',
+        primaryTextColor: '#FFFFFF',
+        primaryBorderColor: '#2C2C2C',
+        lineColor: '#3C3C3C',
+        secondaryColor: '#1A1A1A',
+        tertiaryColor: '#141414',
+        background: '#141414',
+        mainBkg: '#1A1A1A',
+        nodeBorder: '#3C3C3C',
+        clusterBkg: '#1A1A1A',
+        titleColor: '#FFFFFF',
+        edgeLabelBackground: '#1A1A1A',
+      },
+      flowchart: {
+        curve: 'basis',
+        padding: 15,
+        useMaxWidth: true,
+      },
+      mindmap: {
+        padding: 15,
+        useMaxWidth: true,
+      },
+      sequence: {
+        useMaxWidth: true,
+      },
+      securityLevel: 'loose',
+    });
+  }
+};
 
 interface ImageItem {
   id: string;
@@ -98,28 +108,40 @@ const COLORS = {
   highlight: '#FA9D3B',  // 重点内容高亮色（黄色）
 };
 
-// Mermaid 图表渲染组件
-const MermaidDiagram = ({ code }: { code: string }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
+// Mermaid 图表渲染组件 - 使用 React.memo 优化
+const MermaidDiagram = React.memo(({ code }: { code: string }) => {
   const [svg, setSvg] = useState<string>('');
   const [error, setError] = useState<string>('');
 
   useEffect(() => {
+    let mounted = true;
+    
     const renderDiagram = async () => {
       try {
-        const id = `mermaid-${Date.now()}`;
+        // 确保初始化
+        initMermaid();
+        
+        const id = `mermaid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const { svg } = await mermaid.render(id, code);
-        setSvg(svg);
-        setError('');
+        if (mounted) {
+          setSvg(svg);
+          setError('');
+        }
       } catch (err) {
         console.error('Mermaid render error:', err);
-        setError('图表渲染失败');
+        if (mounted) {
+          setError('图表渲染失败，请检查语法');
+        }
       }
     };
     
     if (code) {
       renderDiagram();
     }
+    
+    return () => {
+      mounted = false;
+    };
   }, [code]);
 
   if (error) {
@@ -130,15 +152,24 @@ const MermaidDiagram = ({ code }: { code: string }) => {
     );
   }
 
+  if (!svg) {
+    return (
+      <div className="my-4 p-4 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#1A1A1A', border: '1px solid #2C2C2C', minHeight: '100px' }}>
+        <Loader2 className="w-5 h-5 animate-spin" style={{ color: COLORS.primary }} />
+      </div>
+    );
+  }
+
   return (
     <div 
-      ref={containerRef}
       className="my-4 p-4 rounded-lg overflow-x-auto"
       style={{ backgroundColor: '#1A1A1A', border: '1px solid #2C2C2C' }}
       dangerouslySetInnerHTML={{ __html: svg }}
     />
   );
-};
+});
+
+MermaidDiagram.displayName = 'MermaidDiagram';
 
 export default function HomePage() {
   const searchParams = useSearchParams();
@@ -192,17 +223,21 @@ export default function HomePage() {
     }
   }, [recordId]);
   
-  // 保存数据到 localStorage
+  // 保存数据到 localStorage - 使用防抖优化
   useEffect(() => {
     if (!recordId && (inputText || images.length > 0 || analysisResult)) {
-      localStorage.setItem('cto_current_session', JSON.stringify({
-        inputText,
-        images,
-        scenarios: selectedScenarios,
-        analysisResult,
-        topicTitle,
-        conversationHistory,
-      }));
+      const timer = setTimeout(() => {
+        localStorage.setItem('cto_current_session', JSON.stringify({
+          inputText,
+          images,
+          scenarios: selectedScenarios,
+          analysisResult,
+          topicTitle,
+          conversationHistory,
+        }));
+      }, 500); // 500ms 防抖
+      
+      return () => clearTimeout(timer);
     }
   }, [inputText, images, selectedScenarios, analysisResult, topicTitle, conversationHistory, recordId]);
   
@@ -406,6 +441,8 @@ export default function HomePage() {
       const reader = stream.getReader();
       const decoder = new TextDecoder();
       let fullContent = '';
+      let lastUpdateTime = 0;
+      const UPDATE_INTERVAL = 50; // 50ms 最小更新间隔
       
       while (true) {
         const { done, value } = await reader.read();
@@ -420,15 +457,29 @@ export default function HomePage() {
               const parsed = JSON.parse(data);
               if (parsed.content) {
                 fullContent += parsed.content;
-                // 使用 flushSync 确保立即渲染
-                flushSync(() => {
+                
+                // 使用节流机制，确保更新间隔不小于50ms
+                const now = Date.now();
+                if (now - lastUpdateTime >= UPDATE_INTERVAL) {
+                  lastUpdateTime = now;
+                  // 使用 flushSync 确保立即渲染
+                  flushSync(() => {
+                    setAnalysisResult(fullContent);
+                  });
+                } else {
+                  // 在下一个更新周期更新
                   setAnalysisResult(fullContent);
-                });
+                }
               }
             } catch {}
           }
         }
       }
+      
+      // 确保最后一次更新被渲染
+      flushSync(() => {
+        setAnalysisResult(fullContent);
+      });
       
       setConversationHistory([
         { role: 'user', content: finalText },
@@ -464,6 +515,8 @@ export default function HomePage() {
       const reader = stream.getReader();
       const decoder = new TextDecoder();
       let replyContent = '';
+      let lastUpdateTime = 0;
+      const UPDATE_INTERVAL = 50; // 50ms 最小更新间隔
       
       // 临时添加一个空的 assistant 消息
       setConversationHistory([...newHistory, { role: 'assistant' as const, content: '' }]);
@@ -480,8 +533,21 @@ export default function HomePage() {
               const parsed = JSON.parse(data);
               if (parsed.content) {
                 replyContent += parsed.content;
-                // 更新最后一个 assistant 消息 - 使用 flushSync 确保立即渲染
-                flushSync(() => {
+                
+                // 使用节流机制
+                const now = Date.now();
+                if (now - lastUpdateTime >= UPDATE_INTERVAL) {
+                  lastUpdateTime = now;
+                  flushSync(() => {
+                    setConversationHistory(prev => {
+                      const newHist = [...prev];
+                      if (newHist.length > 0 && newHist[newHist.length - 1].role === 'assistant') {
+                        newHist[newHist.length - 1] = { role: 'assistant', content: replyContent };
+                      }
+                      return newHist;
+                    });
+                  });
+                } else {
                   setConversationHistory(prev => {
                     const newHist = [...prev];
                     if (newHist.length > 0 && newHist[newHist.length - 1].role === 'assistant') {
@@ -489,12 +555,23 @@ export default function HomePage() {
                     }
                     return newHist;
                   });
-                });
+                }
               }
             } catch {}
           }
         }
       }
+      
+      // 确保最后一次更新被渲染
+      flushSync(() => {
+        setConversationHistory(prev => {
+          const newHist = [...prev];
+          if (newHist.length > 0 && newHist[newHist.length - 1].role === 'assistant') {
+            newHist[newHist.length - 1] = { role: 'assistant', content: replyContent };
+          }
+          return newHist;
+        });
+      });
     } catch {}
     finally { setIsFollowUp(false); abortControllerRef.current = null; }
   }, [followUpText, conversationHistory, selectedScenarios]);
@@ -862,7 +939,7 @@ export default function HomePage() {
         <div className="max-w-[1440px] mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img 
-              src="https://code.coze.cn/api/sandbox/coze_coding/file/proxy?expire_time=-1&file_path=assets%2Fimage.png&nonce=7d6188c8-2876-4123-8c2f-976324f83bc9&project_id=7619721306493304872&sign=2d19c3b1974a096a5340bfd153d9b533fb181ba0d19454fda04448a02f9bf225"
+              src="/avatar.png"
               alt="CTO"
               className="w-9 h-9 rounded-lg object-cover"
               style={{ boxShadow: `0 0 0 2px rgba(7, 193, 96, 0.3)` }}
