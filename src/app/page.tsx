@@ -441,40 +441,84 @@ export default function HomePage() {
     let i = 0;
     let key = 0;
     let prefixUsed = false;
-    let currentLevel = 0; // 0=无标题, 1=一级标题, 2=二级标题, 3=三级标题
 
-    const renderInline = (text: string, level: number = currentLevel): React.ReactNode => {
+    const renderInline = (text: string): React.ReactNode => {
       if (!text) return null;
       
-      // 根据层级决定高亮样式
-      const getBoldStyle = (lvl: number): React.CSSProperties => {
-        switch (lvl) {
-          case 1: // 一级标题下 - 黄色
-            return { color: COLORS.highlight };
-          case 2: // 二级标题下 - 白色
-            return { color: '#FFFFFF' };
-          case 3: // 三级标题下 - 白色加粗倾斜
-            return { color: '#FFFFFF', fontStyle: 'italic' };
-          default: // 默认 - 黄色
-            return { color: COLORS.highlight };
-        }
-      };
+      const result: React.ReactNode[] = [];
+      let remaining = text;
+      let partKey = 0;
       
-      // 处理行内代码 `code`
-      const parts = text.split(/(`[^`]+`)/g);
-      return parts.map((part, idx) => {
-        if (part.startsWith('`') && part.endsWith('`')) {
-          return <code key={idx} style={{ backgroundColor: '#2C2C2C', color: COLORS.primary }} className="px-1.5 py-0.5 rounded text-base font-mono">{part.slice(1, -1)}</code>;
+      while (remaining.length > 0) {
+        // 优先匹配代码 `code`
+        const codeMatch = remaining.match(/`([^`]+)`/);
+        // 三级重点 ***text***
+        const h3Match = remaining.match(/\*\*\*([^*]+)\*\*\*/);
+        // 二级重点 **text**
+        const h2Match = remaining.match(/\*\*([^*]+)\*\*/);
+        // 一级重点 *text*（单星号，前后不能是星号）
+        const h1Match = remaining.match(/(?<!\*)\*([^*]+)\*(?!\*)/);
+        
+        // 找到最早匹配的
+        const matches = [
+          codeMatch && { type: 'code', match: codeMatch, index: codeMatch!.index! },
+          h3Match && { type: 'h3', match: h3Match, index: h3Match!.index! },
+          h2Match && { type: 'h2', match: h2Match, index: h2Match!.index! },
+          h1Match && { type: 'h1', match: h1Match, index: h1Match!.index! },
+        ].filter(Boolean) as Array<{ type: string; match: RegExpMatchArray; index: number }>;
+        
+        if (matches.length === 0) {
+          // 没有匹配，直接输出剩余文本
+          result.push(remaining);
+          break;
         }
-        // 处理 **加粗** - 根据层级使用不同样式
-        const boldParts = part.split(/(\*\*[^*]+\*\*)/g);
-        return boldParts.map((bp, j) => {
-          if (bp.startsWith('**') && bp.endsWith('**')) {
-            return <strong key={`${idx}-${j}`} style={getBoldStyle(level)} className="font-semibold inline">{bp.slice(2, -2)}</strong>;
-          }
-          return bp;
-        });
-      });
+        
+        // 找到最早的匹配
+        const earliest = matches.reduce((a, b) => a.index < b.index ? a : b);
+        
+        // 输出匹配前的文本
+        if (earliest.index > 0) {
+          result.push(remaining.slice(0, earliest.index));
+        }
+        
+        // 输出匹配的内容
+        switch (earliest.type) {
+          case 'code':
+            result.push(
+              <code key={partKey++} style={{ backgroundColor: '#2C2C2C', color: COLORS.primary }} className="px-1.5 py-0.5 rounded text-base font-mono">
+                {earliest.match[1]}
+              </code>
+            );
+            remaining = remaining.slice(earliest.index + earliest.match[0].length);
+            break;
+          case 'h3':
+            result.push(
+              <em key={partKey++} style={{ color: '#FFFFFF' }} className="font-semibold">
+                {earliest.match[1]}
+              </em>
+            );
+            remaining = remaining.slice(earliest.index + earliest.match[0].length);
+            break;
+          case 'h2':
+            result.push(
+              <strong key={partKey++} style={{ color: '#FFFFFF' }} className="font-semibold">
+                {earliest.match[1]}
+              </strong>
+            );
+            remaining = remaining.slice(earliest.index + earliest.match[0].length);
+            break;
+          case 'h1':
+            result.push(
+              <strong key={partKey++} style={{ color: COLORS.highlight }} className="font-semibold">
+                {earliest.match[1]}
+              </strong>
+            );
+            remaining = remaining.slice(earliest.index + earliest.match[0].length);
+            break;
+        }
+      }
+      
+      return result;
     };
 
     while (i < lines.length) {
@@ -492,8 +536,6 @@ export default function HomePage() {
       }
       
       if (line.startsWith('### ')) {
-        currentLevel = 3;
-        // 如果还没使用前缀，在第一个元素前添加前缀
         if (prefix && !prefixUsed) {
           elements.push(<p key={key++} className="text-base leading-relaxed mb-2" style={{ color: '#A0A0A0' }}>{prefix}</p>);
           prefixUsed = true;
@@ -503,8 +545,6 @@ export default function HomePage() {
         continue;
       }
       if (line.startsWith('## ')) {
-        currentLevel = 2;
-        // 如果还没使用前缀，在第一个元素前添加前缀
         if (prefix && !prefixUsed) {
           elements.push(<p key={key++} className="text-base leading-relaxed mb-2" style={{ color: '#A0A0A0' }}>{prefix}</p>);
           prefixUsed = true;
@@ -514,8 +554,6 @@ export default function HomePage() {
         continue;
       }
       if (line.startsWith('# ')) {
-        currentLevel = 1;
-        // 如果还没使用前缀，在第一个元素前添加前缀
         if (prefix && !prefixUsed) {
           elements.push(<p key={key++} className="text-base leading-relaxed mb-2" style={{ color: '#A0A0A0' }}>{prefix}</p>);
           prefixUsed = true;
@@ -531,7 +569,6 @@ export default function HomePage() {
           quoteLines.push(lines[i].slice(2));
           i++;
         }
-        // 如果还没使用前缀，在第一个元素前添加前缀
         if (prefix && !prefixUsed) {
           elements.push(<p key={key++} className="text-base leading-relaxed mb-2" style={{ color: '#A0A0A0' }}>{prefix}</p>);
           prefixUsed = true;
@@ -553,7 +590,6 @@ export default function HomePage() {
           items.push(lines[i].slice(2));
           i++;
         }
-        // 如果还没使用前缀，在第一个元素前添加前缀
         if (prefix && !prefixUsed) {
           elements.push(<p key={key++} className="text-base leading-relaxed mb-2" style={{ color: '#A0A0A0' }}>{prefix}</p>);
           prefixUsed = true;
@@ -581,7 +617,6 @@ export default function HomePage() {
             i++;
           } else break;
         }
-        // 如果还没使用前缀，在第一个元素前添加前缀
         if (prefix && !prefixUsed) {
           elements.push(<p key={key++} className="text-base leading-relaxed mb-2" style={{ color: '#A0A0A0' }}>{prefix}</p>);
           prefixUsed = true;
@@ -599,7 +634,6 @@ export default function HomePage() {
         continue;
       }
       
-      // 普通段落 - 如果还没使用前缀，将前缀放在开头
       if (!prefixUsed && prefix) {
         elements.push(
           <p key={key++} className="text-base leading-relaxed my-2" style={{ color: '#A0A0A0' }}>
