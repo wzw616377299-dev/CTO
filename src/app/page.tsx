@@ -898,51 +898,54 @@ export default function HomePage() {
                   <Button 
                     onClick={clearAll}
                     variant="ghost"
-                    className="shrink-0 h-[52px] px-4 gap-2"
-                    style={{ color: '#666666', border: '1px solid #2C2C2C' }}
+                    className="shrink-0 px-4 gap-2"
+                    style={{ color: '#666666', border: '1px solid #2C2C2C', height: '40px' }}
                   >
                     <Plus className="w-4 h-4" />
                     <span className="text-sm">新会话</span>
                   </Button>
                 )}
-                <Textarea 
-                  placeholder={conversationHistory.length > 0 ? "继续追问..." : "输入问题开始分析..."} 
-                  value={followUpText}
-                  onChange={(e) => setFollowUpText(e.target.value)}
-                  className="flex-1 min-h-[52px] max-h-[120px] text-base resize-none rounded-lg"
-                  style={{ backgroundColor: '#141414', border: '1px solid #2C2C2C', color: '#FFFFFF' }}
-                  disabled={isFollowUp || isAnalyzing}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      if (conversationHistory.length > 0) handleFollowUp();
-                      else if (canAnalyze) handleAnalyze();
-                    }
-                  }} 
-                />
-                {isProcessing ? (
-                  <Button onClick={handleStop} className="rounded-lg h-[52px] px-4 shrink-0" style={{ backgroundColor: '#EF4444', color: '#FFFFFF' }}>
-                    <Square className="w-5 h-5" />
-                  </Button>
-                ) : conversationHistory.length > 0 ? (
-                  <Button 
-                    onClick={handleFollowUp} 
-                    disabled={!followUpText.trim()} 
-                    className="rounded-lg h-[52px] px-4 shrink-0 disabled:opacity-40"
-                    style={{ backgroundColor: COLORS.primary, color: '#000000', fontWeight: 500 }}
-                  >
-                    <ArrowUp className="w-5 h-5" />
-                  </Button>
-                ) : (
-                  <Button 
-                    onClick={handleAnalyze} 
-                    disabled={!canAnalyze} 
-                    className="rounded-lg h-[52px] px-4 shrink-0 disabled:opacity-40"
-                    style={{ backgroundColor: COLORS.primary, color: '#000000', fontWeight: 500 }}
-                  >
-                    <ArrowUp className="w-5 h-5" />
-                  </Button>
-                )}
+                <div className="flex-1 flex gap-3 items-center">
+                  <input
+                    type="text"
+                    placeholder={conversationHistory.length > 0 ? "继续追问..." : "输入问题开始分析..."} 
+                    value={followUpText}
+                    onChange={(e) => setFollowUpText(e.target.value)}
+                    className="flex-1 h-10 px-4 text-base rounded-lg outline-none"
+                    style={{ backgroundColor: '#141414', border: '1px solid #2C2C2C', color: '#FFFFFF' }}
+                    disabled={isFollowUp || isAnalyzing}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (conversationHistory.length > 0) handleFollowUp();
+                        else if (canAnalyze) handleAnalyze();
+                      }
+                    }} 
+                  />
+                  {isProcessing ? (
+                    <Button onClick={handleStop} className="rounded-lg h-10 px-4 shrink-0" style={{ backgroundColor: '#EF4444', color: '#FFFFFF' }}>
+                      <Square className="w-5 h-5" />
+                    </Button>
+                  ) : conversationHistory.length > 0 ? (
+                    <Button 
+                      onClick={handleFollowUp} 
+                      disabled={!followUpText.trim()} 
+                      className="rounded-lg h-10 px-4 shrink-0 disabled:opacity-40"
+                      style={{ backgroundColor: COLORS.primary, color: '#000000', fontWeight: 500 }}
+                    >
+                      <ArrowUp className="w-5 h-5" />
+                    </Button>
+                  ) : (
+                    <Button 
+                      onClick={handleAnalyze} 
+                      disabled={!canAnalyze} 
+                      className="rounded-lg h-10 px-4 shrink-0 disabled:opacity-40"
+                      style={{ backgroundColor: COLORS.primary, color: '#000000', fontWeight: 500 }}
+                    >
+                      <ArrowUp className="w-5 h-5" />
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
