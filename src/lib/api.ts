@@ -47,7 +47,7 @@ interface Message {
 
 // Analyze API - returns ReadableStream
 export const analyzeApi = {
-  stream: async (inputText: string, scenario: string = 'work', signal?: AbortSignal, generateReport: boolean = false) => {
+  stream: async (inputText: string, scenario: string = 'work', signal?: AbortSignal, generateReport: boolean = false, title?: string) => {
     const response = await fetch(getApiUrl('/analyze'), {
       method: 'POST',
       headers: getHeaders(),
@@ -57,6 +57,7 @@ export const analyzeApi = {
         saveRecord: true,
         userId: getUserId(),
         generateReport,
+        title,
       }),
       signal,
     });

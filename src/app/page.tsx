@@ -281,30 +281,6 @@ export default function HomePage() {
     localStorage.removeItem('cto_current_session');
   };
   
-  // 生成主题标题
-  const generateTopicTitle = useCallback(async (inputText: string) => {
-    if (!inputText.trim()) return;
-    
-    setIsGeneratingTitle(true);
-    try {
-      const response = await fetch('/api/title', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ inputText }),
-      });
-      const data = await response.json();
-      if (data.title) {
-        setTopicTitle(data.title);
-      }
-    } catch {
-      // 失败时使用简单截取
-      const title = inputText.replace(/\n/g, ' ').slice(0, 20);
-      setTopicTitle(title + (inputText.length > 20 ? '...' : ''));
-    } finally {
-      setIsGeneratingTitle(false);
-    }
-  }, []);
-
   const handleAnalyze = useCallback(async () => {
     const hasText = inputText.trim().length > 0;
     const hasImages = images.length > 0;
@@ -331,12 +307,31 @@ export default function HomePage() {
       
       if (!finalText.trim()) { setIsAnalyzing(false); return; }
       
-      // 生成主题标题
-      generateTopicTitle(finalText);
+      // 先生成主题标题
+      let title = '';
+      setIsGeneratingTitle(true);
+      try {
+        const titleResponse = await fetch('/api/title', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ inputText: finalText }),
+        });
+        const titleData = await titleResponse.json();
+        if (titleData.title) {
+          title = titleData.title;
+          setTopicTitle(title);
+        }
+      } catch {
+        // 失败时使用简单截取
+        title = finalText.replace(/\n/g, ' ').slice(0, 20);
+        setTopicTitle(title + (finalText.length > 20 ? '...' : ''));
+      } finally {
+        setIsGeneratingTitle(false);
+      }
       
       abortControllerRef.current = new AbortController();
       const scenario = selectedScenarios.join(',');
-      const stream = await analyzeApi.stream(finalText, scenario, abortControllerRef.current.signal, generateReport);
+      const stream = await analyzeApi.stream(finalText, scenario, abortControllerRef.current.signal, generateReport, title);
       if (!stream) throw new Error('No stream');
       
       const reader = stream.getReader();
@@ -373,7 +368,7 @@ export default function HomePage() {
       abortControllerRef.current = null;
       ocrAbortControllerRef.current = null;
     }
-  }, [inputText, images, selectedScenarios, generateReport, generateTopicTitle]);
+  }, [inputText, images, selectedScenarios, generateReport]);
 
   const handleFollowUp = useCallback(async () => {
     if (!followUpText.trim() || conversationHistory.length === 0) return;
@@ -607,10 +602,10 @@ export default function HomePage() {
           // 老陈回答
           elements.push(
             <div key={`a-${i}`} className="mt-4">
-              <p className="text-base leading-relaxed" style={{ color: '#A0A0A0' }}>
+              <div className="text-base leading-relaxed">
                 <span className="font-medium" style={{ color: COLORS.primary }}>老陈：</span>
-                {msg.content}
-              </p>
+                {renderMarkdown(msg.content)}
+              </div>
             </div>
           );
         }

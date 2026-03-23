@@ -195,6 +195,7 @@ export async function POST(request: NextRequest) {
       isFollowUp = false,
       history = [],
       generateReport = false,
+      title: customTitle,
     } = body as {
       inputText?: string;
       imageUrls?: string[];
@@ -204,6 +205,7 @@ export async function POST(request: NextRequest) {
       isFollowUp?: boolean;
       history?: Message[];
       generateReport?: boolean;
+      title?: string;
     };
     
     if (!inputText?.trim()) {
@@ -276,7 +278,8 @@ export async function POST(request: NextRequest) {
           if (saveRecord && userId && !isFollowUp) {
             try {
               const supabaseClient = getSupabaseClient();
-              const title = inputText.slice(0, 80) + (inputText.length > 80 ? '...' : '');
+              // 使用前端传入的标题，如果没有则截取输入内容
+              const title = customTitle || inputText.slice(0, 80) + (inputText.length > 80 ? '...' : '');
               
               // 插入新记录
               await supabaseClient.from('analysis_records').insert({
