@@ -408,7 +408,10 @@ export async function POST(request: NextRequest) {
             }
           }
           
-          // 保存记录
+          // 发送完成信号
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+          
+          // 保存记录（在发送完成信号之后，关闭 controller 之前）
           if (saveRecord && userId && !isFollowUp) {
             try {
               const supabaseClient = getSupabaseClient();
@@ -441,14 +444,17 @@ export async function POST(request: NextRequest) {
                   .delete()
                   .in('id', idsToDelete);
               }
-            } catch {}
+            } catch (dbError) {
+              console.error('Database save error:', dbError);
+            }
           }
           
-          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
           controller.close();
         } catch (streamError) {
           console.error('Stream error:', streamError);
-          controller.close();
+          try {
+            controller.close();
+          } catch {}
         }
       }
     });
