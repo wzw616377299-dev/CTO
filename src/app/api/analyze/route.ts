@@ -278,6 +278,7 @@ export async function POST(request: NextRequest) {
               const supabaseClient = getSupabaseClient();
               const title = inputText.slice(0, 80) + (inputText.length > 80 ? '...' : '');
               
+              // 插入新记录
               await supabaseClient.from('analysis_records').insert({
                 user_id: userId,
                 input_text: inputText,
@@ -287,6 +288,22 @@ export async function POST(request: NextRequest) {
                 mode: scenario,
                 response_scripts: [fullContent],
               });
+              
+              // 获取该用户的所有记录ID（按时间降序）
+              const { data: allRecords } = await supabaseClient
+                .from('analysis_records')
+                .select('id')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false });
+              
+              // 如果超过30条，删除多余的旧记录
+              if (allRecords && allRecords.length > 30) {
+                const idsToDelete = allRecords.slice(30).map(r => r.id);
+                await supabaseClient
+                  .from('analysis_records')
+                  .delete()
+                  .in('id', idsToDelete);
+              }
             } catch {}
           }
           

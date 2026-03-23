@@ -40,12 +40,13 @@ const SCENARIOS = [
 
 const MAX_IMAGES = 20;
 
-// 主题色配置
+// 主题色配置 - 微信绿
 const THEME = {
-  primary: 'text-cyan-400',
-  primaryBg: 'bg-cyan-400',
-  primaryBorder: 'border-cyan-400',
-  highlight: 'text-cyan-300',
+  primary: 'text-[#07C160]',
+  primaryBg: 'bg-[#07C160]',
+  primaryBgLight: 'bg-[#07C160]/10',
+  primaryBorder: 'border-[#07C160]',
+  highlight: 'text-[#1AAD19]',
   accent: 'text-amber-400',
   accentBg: 'bg-amber-400',
   danger: 'text-rose-400',
@@ -59,7 +60,7 @@ export default function HomePage() {
   
   const [inputText, setInputText] = useState('');
   const [images, setImages] = useState<ImageItem[]>([]);
-  const [selectedScenarios, setSelectedScenarios] = useState<string[]>(['work']);
+  const [selectedScenarios, setSelectedScenarios] = useState<string[]>(['work', 'understand', 'concept']);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isOcring, setIsOcring] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<string>('');
@@ -445,13 +446,13 @@ export default function HomePage() {
       const parts = text.split(/(`[^`]+`)/g);
       return parts.map((part, idx) => {
         if (part.startsWith('`') && part.endsWith('`')) {
-          return <code key={idx} className="bg-slate-700/50 text-cyan-400 px-1.5 py-0.5 rounded text-base font-mono">{part.slice(1, -1)}</code>;
+          return <code key={idx} className="bg-slate-700/50 text-[#07C160] px-1.5 py-0.5 rounded text-base font-mono">{part.slice(1, -1)}</code>;
         }
         // 处理 **加粗** - 重点内容青色高亮
         const boldParts = part.split(/(\*\*[^*]+\*\*)/g);
         return boldParts.map((bp, j) => {
           if (bp.startsWith('**') && bp.endsWith('**')) {
-            return <strong key={`${idx}-${j}`} className="text-cyan-300 font-semibold">{bp.slice(2, -2)}</strong>;
+            return <strong key={`${idx}-${j}`} className="text-[#1AAD19] font-semibold">{bp.slice(2, -2)}</strong>;
           }
           return bp;
         });
@@ -473,17 +474,17 @@ export default function HomePage() {
       }
       
       if (line.startsWith('### ')) {
-        elements.push(<h4 key={key++} className="text-lg font-semibold text-slate-200 mt-6 mb-3 flex items-center gap-2"><span className="w-1 h-5 bg-cyan-500 rounded-full"></span>{renderInline(line.slice(4))}</h4>);
+        elements.push(<h4 key={key++} className="text-lg font-semibold text-slate-200 mt-6 mb-3 flex items-center gap-2"><span className="w-1 h-5 bg-#07C160 rounded-full"></span>{renderInline(line.slice(4))}</h4>);
         i++;
         continue;
       }
       if (line.startsWith('## ')) {
-        elements.push(<h3 key={key++} className="text-xl font-semibold text-slate-100 mt-8 mb-3 flex items-center gap-2"><span className="w-1.5 h-6 bg-cyan-500 rounded-full"></span>{renderInline(line.slice(3))}</h3>);
+        elements.push(<h3 key={key++} className="text-xl font-semibold text-slate-100 mt-8 mb-3 flex items-center gap-2"><span className="w-1.5 h-6 bg-#07C160 rounded-full"></span>{renderInline(line.slice(3))}</h3>);
         i++;
         continue;
       }
       if (line.startsWith('# ')) {
-        elements.push(<h2 key={key++} className="text-2xl font-bold text-white mt-10 mb-4 flex items-center gap-2"><span className="w-2 h-7 bg-cyan-400 rounded-full"></span>{renderInline(line.slice(2))}</h2>);
+        elements.push(<h2 key={key++} className="text-2xl font-bold text-white mt-10 mb-4 flex items-center gap-2"><span className="w-2 h-7 bg-#07C160 rounded-full"></span>{renderInline(line.slice(2))}</h2>);
         i++;
         continue;
       }
@@ -495,10 +496,10 @@ export default function HomePage() {
           i++;
         }
         elements.push(
-          <div key={key++} className="border-l-2 border-cyan-500/60 bg-slate-800/30 pl-4 py-3 my-4 rounded-r-lg group relative">
+          <div key={key++} className="border-l-2 border-#07C160/60 bg-slate-800/30 pl-4 py-3 my-4 rounded-r-lg group relative">
             <div className="text-base text-slate-300 leading-relaxed whitespace-pre-wrap">{renderInline(quoteLines.join('\n'))}</div>
             <button onClick={() => copyText(quoteLines.join('\n'))} className="absolute top-2 right-2 p-1.5 rounded bg-slate-700/80 opacity-0 group-hover:opacity-100 transition-all hover:bg-slate-600">
-              {copiedText === quoteLines.join('\n') ? <Check className="w-4 h-4 text-cyan-400" /> : <Copy className="w-4 h-4 text-slate-400" />}
+              {copiedText === quoteLines.join('\n') ? <Check className="w-4 h-4 text-#07C160" /> : <Copy className="w-4 h-4 text-slate-400" />}
             </button>
           </div>
         );
@@ -593,9 +594,9 @@ export default function HomePage() {
           );
         } else if (msg.role === 'assistant') {
           elements.push(
-            <div key={`a-${i}`} className="bg-gradient-to-br from-cyan-500/5 to-slate-900/50 border border-cyan-500/20 rounded-xl p-5 my-4">
+            <div key={`a-${i}`} className="bg-gradient-to-br from-#07C160/5 to-slate-900/50 border border-#07C160/20 rounded-xl p-5 my-4">
               <div className="flex items-center gap-2 mb-4">
-                <span className="px-2.5 py-1 text-xs font-medium bg-cyan-500/15 text-cyan-400 rounded-md border border-cyan-500/25">
+                <span className="px-2.5 py-1 text-xs font-medium bg-#07C160/15 text-#07C160 rounded-md border border-#07C160/25">
                   回答
                 </span>
               </div>
@@ -627,10 +628,10 @@ export default function HomePage() {
   return (
     <div className="h-screen flex flex-col bg-slate-950 text-slate-100">
       {isDragging && (
-        <div className="fixed inset-0 bg-slate-950/98 z-50 flex items-center justify-center border-2 border-dashed border-cyan-500/50 m-4 rounded-xl">
+        <div className="fixed inset-0 bg-slate-950/98 z-50 flex items-center justify-center border-2 border-dashed border-#07C160/50 m-4 rounded-xl">
           <div className="text-center">
             <div className="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center mx-auto mb-4 border border-slate-700">
-              <ImageIcon className="w-8 h-8 text-cyan-400" />
+              <ImageIcon className="w-8 h-8 text-#07C160" />
             </div>
             <p className="text-slate-300 text-lg">释放以上传图片</p>
           </div>
@@ -644,7 +645,7 @@ export default function HomePage() {
             <img 
               src="https://code.coze.cn/api/sandbox/coze_coding/file/proxy?expire_time=-1&file_path=assets%2Fimage.png&nonce=7d6188c8-2876-4123-8c2f-976324f83bc9&project_id=7619721306493304872&sign=2d19c3b1974a096a5340bfd153d9b533fb181ba0d19454fda04448a02f9bf225"
               alt="CTO"
-              className="w-9 h-9 rounded-lg object-cover ring-2 ring-cyan-500/30"
+              className="w-9 h-9 rounded-lg object-cover ring-2 ring-#07C160/30"
             />
             <div>
               <span className="text-lg font-semibold text-white">首席技术官</span>
@@ -674,7 +675,7 @@ export default function HomePage() {
                       onClick={() => toggleScenario(s.id)}
                       className={`px-4 py-2 text-sm rounded-lg transition-all border ${
                         selectedScenarios.includes(s.id) 
-                          ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/50 shadow-sm shadow-cyan-500/10' 
+                          ? 'bg-#07C160/10 text-#07C160 border-#07C160/50 shadow-sm shadow-#07C160/10' 
                           : 'bg-slate-800/50 text-slate-400 border-slate-700/50 hover:border-slate-600 hover:text-slate-300'
                       }`}
                     >
@@ -693,7 +694,7 @@ export default function HomePage() {
                       <div key={img.id} className="relative aspect-square bg-slate-800/50 rounded-lg overflow-hidden group border border-slate-700/50">
                         {img.isUploading ? (
                           <div className="w-full h-full flex items-center justify-center">
-                            <Loader2 className="w-5 h-5 animate-spin text-cyan-400" />
+                            <Loader2 className="w-5 h-5 animate-spin text-#07C160" />
                           </div>
                         ) : (
                           <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
@@ -709,7 +710,7 @@ export default function HomePage() {
                     {images.length < MAX_IMAGES && (
                       <button 
                         onClick={() => fileInputRef.current?.click()} 
-                        className="aspect-square border border-dashed border-slate-700 rounded-lg flex items-center justify-center hover:border-cyan-500/50 hover:bg-slate-800/30 transition-all"
+                        className="aspect-square border border-dashed border-slate-700 rounded-lg flex items-center justify-center hover:border-#07C160/50 hover:bg-slate-800/30 transition-all"
                       >
                         <Plus className="w-5 h-5 text-slate-600" />
                       </button>
@@ -724,7 +725,7 @@ export default function HomePage() {
                 placeholder="粘贴开发说的话...&#10;&#10;支持 Ctrl+V 粘贴截图" 
                 value={inputText} 
                 onChange={(e) => setInputText(e.target.value)}
-                className="flex-1 min-h-0 bg-slate-800/30 border-slate-700/50 text-white text-base placeholder:text-slate-600 focus:border-cyan-500/50 focus:ring-cyan-500/10 resize-none overflow-y-auto rounded-lg" 
+                className="flex-1 min-h-0 bg-slate-800/30 border-slate-700/50 text-white text-base placeholder:text-slate-600 focus:border-#07C160/50 focus:ring-#07C160/10 resize-none overflow-y-auto rounded-lg" 
                 disabled={isProcessing} 
               />
               
@@ -734,7 +735,7 @@ export default function HomePage() {
                   type="checkbox" 
                   checked={generateReport} 
                   onChange={(e) => setGenerateReport(e.target.checked)} 
-                  className="rounded border-slate-600 bg-slate-800 text-cyan-500 focus:ring-cyan-500/30" 
+                  className="rounded border-slate-600 bg-slate-800 text-#07C160 focus:ring-#07C160/30" 
                 />
                 <GitBranch className="w-4 h-4 text-slate-500" />
                 生成汇报框架
@@ -769,7 +770,7 @@ export default function HomePage() {
                   <Button 
                     onClick={handleAnalyze} 
                     disabled={!canAnalyze} 
-                    className="bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-medium rounded-lg h-10 px-5 text-base disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-cyan-500/20"
+                    className="bg-#07C160 hover:bg-#07C160 text-slate-900 font-medium rounded-lg h-10 px-5 text-base disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-#07C160/20"
                   >
                     <ArrowUp className="w-4 h-4 mr-1.5" />分析
                   </Button>
@@ -784,7 +785,7 @@ export default function HomePage() {
             {topicTitle && (
               <div className="shrink-0 px-6 py-4 border-b border-slate-800/60 bg-slate-900/20">
                 <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400/50" />
+                  <div className="w-2 h-2 rounded-full bg-#07C160 shadow-sm shadow-#07C160/50" />
                   <h1 className="text-xl font-semibold text-white">{topicTitle}</h1>
                   {isGeneratingTitle && <Loader2 className="w-4 h-4 animate-spin text-slate-500" />}
                 </div>
@@ -831,7 +832,7 @@ export default function HomePage() {
               {reportContent && (
                 <div className="mt-8 pt-8 border-t border-slate-800/60">
                   <div className="flex items-center gap-2 mb-5">
-                    <GitBranch className="w-5 h-5 text-cyan-400" />
+                    <GitBranch className="w-5 h-5 text-#07C160" />
                     <span className="text-lg font-semibold text-white">向上级汇报框架</span>
                   </div>
                   <div className="text-base leading-relaxed">{renderMarkdown(reportContent)}</div>
@@ -848,7 +849,7 @@ export default function HomePage() {
                   placeholder={conversationHistory.length > 0 ? "继续追问..." : "输入问题开始分析..."} 
                   value={followUpText}
                   onChange={(e) => setFollowUpText(e.target.value)}
-                  className="flex-1 min-h-[52px] max-h-[120px] bg-slate-800/30 border-slate-700/50 text-white text-base placeholder:text-slate-600 focus:border-cyan-500/50 focus:ring-cyan-500/10 resize-none rounded-lg"
+                  className="flex-1 min-h-[52px] max-h-[120px] bg-slate-800/30 border-slate-700/50 text-white text-base placeholder:text-slate-600 focus:border-#07C160/50 focus:ring-#07C160/10 resize-none rounded-lg"
                   disabled={isFollowUp || isAnalyzing}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -866,7 +867,7 @@ export default function HomePage() {
                   <Button 
                     onClick={handleFollowUp} 
                     disabled={!followUpText.trim()} 
-                    className="bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-medium rounded-lg h-[52px] px-4 shrink-0 disabled:opacity-40 shadow-lg shadow-cyan-500/20"
+                    className="bg-#07C160 hover:bg-#07C160 text-slate-900 font-medium rounded-lg h-[52px] px-4 shrink-0 disabled:opacity-40 shadow-lg shadow-#07C160/20"
                   >
                     <ArrowUp className="w-5 h-5" />
                   </Button>
@@ -874,7 +875,7 @@ export default function HomePage() {
                   <Button 
                     onClick={handleAnalyze} 
                     disabled={!canAnalyze} 
-                    className="bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-medium rounded-lg h-[52px] px-4 shrink-0 disabled:opacity-40 shadow-lg shadow-cyan-500/20"
+                    className="bg-#07C160 hover:bg-#07C160 text-slate-900 font-medium rounded-lg h-[52px] px-4 shrink-0 disabled:opacity-40 shadow-lg shadow-#07C160/20"
                   >
                     <ArrowUp className="w-5 h-5" />
                   </Button>

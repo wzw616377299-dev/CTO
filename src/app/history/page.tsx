@@ -134,7 +134,7 @@ export default function HistoryPage() {
             placeholder="搜索历史记录..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="pl-12 h-12 bg-slate-900/50 border-slate-800 text-white text-base placeholder:text-slate-600 focus:border-cyan-500/50 rounded-lg"
+            className="pl-12 h-12 bg-slate-900/50 border-slate-800 text-white text-base placeholder:text-slate-600 focus:border-#07C160/50 rounded-lg"
           />
         </div>
 
@@ -156,7 +156,7 @@ export default function HistoryPage() {
               <div 
                 key={record.id}
                 onClick={() => handleContinueChat(record)}
-                className="group bg-slate-900/30 border border-slate-800/60 rounded-xl p-4 hover:border-cyan-500/30 cursor-pointer transition-all hover:bg-slate-900/50"
+                className="group bg-slate-900/30 border border-slate-800/60 rounded-xl p-4 hover:border-#07C160/30 cursor-pointer transition-all hover:bg-slate-900/50"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
@@ -169,7 +169,7 @@ export default function HistoryPage() {
                     <div className="flex items-center gap-3 text-xs text-slate-600 flex-wrap">
                       <span>{formatDate(record.created_at)}</span>
                       {record.mode && getModeLabels(record.mode).map((label, idx) => (
-                        <span key={idx} className="px-2 py-0.5 bg-cyan-500/10 text-cyan-400 rounded border border-cyan-500/20">
+                        <span key={idx} className="px-2 py-0.5 bg-#07C160/10 text-#07C160 rounded border border-#07C160/20">
                           {label}
                         </span>
                       ))}
@@ -195,7 +195,7 @@ export default function HistoryPage() {
                     >
                       <Trash2 className="w-5 h-5" />
                     </button>
-                    <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                    <div className="p-2 rounded-lg bg-#07C160/10 text-#07C160 border border-#07C160/20">
                       <MessageCircle className="w-5 h-5" />
                     </div>
                   </div>
