@@ -572,7 +572,7 @@ export default function HomePage() {
     return elements;
   };
 
-  // 渲染对话历史 - 微信聊天样式
+  // 渲染对话历史
   const renderConversation = () => {
     const elements: React.ReactNode[] = [];
     
@@ -582,21 +582,8 @@ export default function HomePage() {
     // 渲染第一次回答（使用 analysisResult 支持流式输出）
     if (analysisResult) {
       elements.push(
-        <div key="main-answer" className="flex gap-3 mb-6">
-          {/* 老陈头像 */}
-          <img 
-            src={avatarUrl}
-            alt="老陈"
-            className="w-10 h-10 rounded-lg object-cover shrink-0"
-            style={{ boxShadow: `0 0 0 2px rgba(7, 193, 96, 0.3)` }}
-          />
-          {/* 消息气泡 */}
-          <div className="flex-1 min-w-0">
-            <div className="text-xs mb-1.5" style={{ color: '#4A4A4A' }}>老陈</div>
-            <div className="rounded-2xl rounded-tl-sm p-4" style={{ backgroundColor: '#1A1A1A' }}>
-              <div className="text-base leading-relaxed">{renderMarkdown(analysisResult)}</div>
-            </div>
-          </div>
+        <div key="main-answer" className="mb-6">
+          {renderMarkdown(analysisResult)}
         </div>
       );
     }
@@ -607,33 +594,30 @@ export default function HomePage() {
         const msg = conversationHistory[i];
         
         if (msg.role === 'user') {
-          // 用户追问 - 右对齐，不带头像
+          // 用户追问
           elements.push(
-            <div key={`q-${i}`} className="flex gap-3 mb-4 justify-end">
-              <div className="max-w-[85%]">
-                <div className="rounded-2xl rounded-tr-sm p-4" style={{ backgroundColor: COLORS.primary }}>
-                  <p className="text-base" style={{ color: '#000000' }}>{msg.content}</p>
-                </div>
+            <div key={`q-${i}`} className="mt-8 pt-6" style={{ borderTop: '1px solid #1A1A1A' }}>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-sm font-medium" style={{ color: '#666666' }}>追问</span>
               </div>
+              <p className="text-base" style={{ color: '#A0A0A0' }}>{msg.content}</p>
             </div>
           );
         } else if (msg.role === 'assistant') {
-          // 老陈回答 - 左对齐，带头像
+          // 老陈回答
           elements.push(
-            <div key={`a-${i}`} className="flex gap-3 mb-4">
-              <img 
-                src={avatarUrl}
-                alt="老陈"
-                className="w-10 h-10 rounded-lg object-cover shrink-0"
-                style={{ boxShadow: `0 0 0 2px rgba(7, 193, 96, 0.3)` }}
-              />
-              <div className="flex-1 min-w-0">
-                <div className="text-xs mb-1.5" style={{ color: '#4A4A4A' }}>老陈</div>
-                <div className="rounded-2xl rounded-tl-sm p-4" style={{ backgroundColor: '#1A1A1A' }}>
-                  <div className="text-base leading-relaxed">
-                    {renderMarkdown(msg.content)}
-                  </div>
-                </div>
+            <div key={`a-${i}`} className="mt-4">
+              <div className="flex items-center gap-2 mb-3">
+                <img 
+                  src={avatarUrl}
+                  alt="老陈"
+                  className="w-6 h-6 rounded object-cover"
+                  style={{ boxShadow: `0 0 0 1px rgba(7, 193, 96, 0.3)` }}
+                />
+                <span className="text-sm font-medium" style={{ color: COLORS.primary }}>老陈</span>
+              </div>
+              <div className="text-base leading-relaxed">
+                {renderMarkdown(msg.content)}
               </div>
             </div>
           );
@@ -645,21 +629,8 @@ export default function HomePage() {
     if (isFollowUp && conversationHistory.length > 0 && 
         conversationHistory[conversationHistory.length - 1].role === 'user') {
       elements.push(
-        <div key="loading" className="flex gap-3 mb-4">
-          <img 
-            src={avatarUrl}
-            alt="老陈"
-            className="w-10 h-10 rounded-lg object-cover shrink-0"
-            style={{ boxShadow: `0 0 0 2px rgba(7, 193, 96, 0.3)` }}
-          />
-          <div className="flex-1 min-w-0">
-            <div className="text-xs mb-1.5" style={{ color: '#4A4A4A' }}>老陈</div>
-            <div className="rounded-2xl rounded-tl-sm px-4 py-3" style={{ backgroundColor: '#1A1A1A' }}>
-              <div className="flex items-center gap-2 text-base" style={{ color: '#666666' }}>
-                <Loader2 className="w-4 h-4 animate-spin" /><span>思考中...</span>
-              </div>
-            </div>
-          </div>
+        <div key="loading" className="flex items-center gap-2 text-base mt-4" style={{ color: '#666666' }}>
+          <Loader2 className="w-5 h-5 animate-spin" /><span>思考中...</span>
         </div>
       );
     }
