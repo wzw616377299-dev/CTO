@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { flushSync } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { 
@@ -345,7 +346,13 @@ export default function HomePage() {
             if (data === '[DONE]') continue;
             try {
               const parsed = JSON.parse(data);
-              if (parsed.content) { fullContent += parsed.content; setAnalysisResult(fullContent); }
+              if (parsed.content) {
+                fullContent += parsed.content;
+                // 使用 flushSync 确保立即渲染
+                flushSync(() => {
+                  setAnalysisResult(fullContent);
+                });
+              }
             } catch {}
           }
         }
@@ -401,13 +408,15 @@ export default function HomePage() {
               const parsed = JSON.parse(data);
               if (parsed.content) {
                 replyContent += parsed.content;
-                // 更新最后一个 assistant 消息
-                setConversationHistory(prev => {
-                  const newHist = [...prev];
-                  if (newHist.length > 0 && newHist[newHist.length - 1].role === 'assistant') {
-                    newHist[newHist.length - 1] = { role: 'assistant', content: replyContent };
-                  }
-                  return newHist;
+                // 更新最后一个 assistant 消息 - 使用 flushSync 确保立即渲染
+                flushSync(() => {
+                  setConversationHistory(prev => {
+                    const newHist = [...prev];
+                    if (newHist.length > 0 && newHist[newHist.length - 1].role === 'assistant') {
+                      newHist[newHist.length - 1] = { role: 'assistant', content: replyContent };
+                    }
+                    return newHist;
+                  });
                 });
               }
             } catch {}
