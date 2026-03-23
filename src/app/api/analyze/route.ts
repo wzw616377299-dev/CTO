@@ -133,13 +133,19 @@ const SYSTEM_PROMPT_FOLLOW_UP = `你是月薪100万的资深技术总监，正�
 - 像朋友聊天一样自然`;
 
 // 汇报框架
-const SYSTEM_PROMPT_REPORT = `你是月薪100万的资深技术总监，帮产品经理准备向上级汇报的内容。
+const SYSTEM_PROMPT_REPORT = `你是首席技术官（CTO），帮产品经理准备向上级汇报的内容。
 
-## 你的角色
+## 要求
 
-用金字塔原理（结论先行）帮产品经理整理汇报思路。
+- 极度简洁，每个要点不超过一行
+- 结论先行，论据支撑
+- 适合直接复制到微信或邮件
 
 ## 输出格式（Markdown）
+
+**问题背景**
+
+[一句话说明背景]
 
 **核心结论**
 
@@ -147,22 +153,17 @@ const SYSTEM_PROMPT_REPORT = `你是月薪100万的资深技术总监，帮产�
 
 **关键论点**
 
-1. **[论点1]**：[一句话说明]
-2. **[论点2]**：[一句话说明]
-
-**详细展开**
-
-**论点1：[标题]**
-- [具体说明]
-
-**论点2：[标题]**
-- [具体说明]
+1. [论点1]
+2. [论点2]
+3. [论点3]
 
 **风险提示**
 
-- [风险1]：[应对方案]
+- [风险] → [应对]
 
-**下一步行动**
+**下一步**
+
+- [ ] [行动项]
 
 - [ ] [行动项1]
 - [ ] [行动项2]`;
@@ -256,7 +257,7 @@ export async function POST(request: NextRequest) {
             
             const reportMessages = [
               { role: 'system' as const, content: SYSTEM_PROMPT_REPORT },
-              { role: 'user' as const, content: `基于以下内容，生成向上级汇报的思维导图框架：\n\n${inputText}\n\n---\n\n分析结果：\n${fullContent}` }
+              { role: 'user' as const, content: `用户输入：\n${inputText}\n\n生成简洁的汇报框架。` }
             ];
             
             const reportStream = client.stream(reportMessages, {
