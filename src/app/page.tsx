@@ -71,7 +71,6 @@ const COLORS = {
 // Mermaid 图表渲染组件 - 使用动态导入避免 SSR 问题
 const MermaidDiagram = React.memo(({ code }: { code: string }) => {
   const [svg, setSvg] = useState<string>('');
-  const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -108,24 +107,56 @@ const MermaidDiagram = React.memo(({ code }: { code: string }) => {
           securityLevel: 'loose',
         });
         
-        // 清理代码，移除可能导致错误的特殊字符
+        // 全面的代码清理，修复常见的 Mermaid 语法错误
         let cleanedCode = code
-          .replace(/subgraph\s+([^\[]+)\s*\[/g, 'subgraph $1[')  // 清理 subgraph 名称
-          .replace(/subgraph\s+([^\["\s]+)\s/g, 'subgraph $1 ')  // 确保正确格式
-          .replace(/[（）/]/g, match => match === '（' ? '(' : match === '）' ? ')' : ''); // 替换中文括号
+          // 1. 替换中文括号为英文
+          .replace(/[（）【】《》「」『』〈〉]/g, match => {
+            const map: Record<string, string> = {
+              '（': '(', '）': ')', '【': '[', '】': ']',
+              '《': '<', '》': '>', '「': '"', '」': '"',
+              '『': '"', '』': '"', '〈': '<', '〉': '>'
+            };
+            return map[match] || match;
+          })
+          // 2. 替换中文标点
+          .replace(/[，。！？、；：]/g, '')
+          // 3. 清理 subgraph 语法 - 确保格式正确
+          .replace(/subgraph\s+([^\[\n]+)/g, (match, name) => {
+            // 如果名称包含特殊字符，用引号包裹
+            const trimmed = name.trim();
+            if (trimmed && !trimmed.startsWith('"')) {
+              return `subgraph ${trimmed}`;
+            }
+            return match;
+          })
+          // 4. 修复节点定义中的中文 - 确保用引号包裹
+          .replace(/([A-Za-z_][A-Za-z0-9_]*)\s*\[\s*([^\]\[]*[^\x00-\xff][^\]\[]*)\s*\]/g, (match, id, label) => {
+            // 如果标签包含中文，确保正确格式
+            return `${id}["${label.trim()}"]`;
+          })
+          // 5. 移除多余的空格和换行
+          .replace(/\n\s*\n/g, '\n')
+          .trim();
+        
+        // 验证代码是否有效（基本检查）
+        if (!cleanedCode || cleanedCode.length < 10) {
+          if (mounted) {
+            setLoading(false);
+          }
+          return;
+        }
         
         const id = `mermaid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const { svg } = await mermaid.render(id, cleanedCode);
         
         if (mounted) {
           setSvg(svg);
-          setError('');
           setLoading(false);
         }
       } catch (err) {
-        console.error('Mermaid render error:', err);
+        // 静默失败，不显示错误
+        console.warn('Mermaid render skipped:', err);
         if (mounted) {
-          setError('图表渲染失败');
           setLoading(false);
         }
       }
@@ -140,20 +171,17 @@ const MermaidDiagram = React.memo(({ code }: { code: string }) => {
     };
   }, [code]);
 
-  if (error) {
-    return (
-      <div className="my-4 p-4 rounded-lg" style={{ backgroundColor: '#1A1A1A', border: '1px solid #2C2C2C' }}>
-        <p className="text-sm" style={{ color: '#666666' }}>{error}</p>
-      </div>
-    );
-  }
-
+  // 错误时不显示任何内容
   if (!svg) {
-    return (
-      <div className="my-4 p-4 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#1A1A1A', border: '1px solid #2C2C2C', minHeight: '100px' }}>
-        <Loader2 className="w-5 h-5 animate-spin" style={{ color: COLORS.primary }} />
-      </div>
-    );
+    if (loading) {
+      return (
+        <div className="my-4 p-4 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#1A1A1A', border: '1px solid #2C2C2C', minHeight: '60px' }}>
+          <Loader2 className="w-4 h-4 animate-spin" style={{ color: COLORS.primary }} />
+        </div>
+      );
+    }
+    // 渲染失败时静默返回 null
+    return null;
   }
 
   return (
