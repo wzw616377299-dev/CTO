@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LLMClient, Config, HeaderUtils, SearchClient } from 'coze-coding-dev-sdk';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { getModelConfig, CURRENT_MODEL_VERSION } from '@/config/model.config';
 
 // 企微沟通场景
 const SYSTEM_PROMPT_WORK = `你是首席技术官（CTO），产品经理的战略合作伙伴。
@@ -406,10 +407,12 @@ export async function POST(request: NextRequest) {
         
         try {
           // 统一使用假流式：先获取完整内容，再逐字发送
-          // 原因：doubao-seed-2-0-pro-260215 模型不支持真正的流式输出
+          // 使用集中的模型配置，便于后续更新
+          const modelConfig = getModelConfig('primary');
+          
           const response = await client.invoke(messages, {
-            model: 'doubao-seed-2-0-pro-260215',
-            temperature: 0.7,
+            model: modelConfig.model,
+            temperature: modelConfig.temperature,
           });
           
           fullContent = response.content;

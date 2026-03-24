@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LLMClient, Config, HeaderUtils } from 'coze-coding-dev-sdk';
+import { getModelConfig } from '@/config/model.config';
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,10 +31,13 @@ export async function POST(request: NextRequest) {
       }
     ];
     
+    // 使用轻量模型生成标题，更快更省
+    const modelConfig = getModelConfig('title');
+    
     let title = '';
     const stream = client.stream(messages, {
-      model: 'doubao-seed-2-0-pro-260215',
-      temperature: 0.3,
+      model: modelConfig.model,
+      temperature: modelConfig.temperature,
     });
     
     for await (const chunk of stream) {
