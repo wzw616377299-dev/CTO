@@ -340,6 +340,17 @@ interface Message {
   content: string;
 }
 
+// 假流式输出：将完整内容分块发送，模拟流式效果
+async function* fakeStreamGenerator(content: string, chunkSize: number = 5): AsyncGenerator<string> {
+  const chars = content.split('');
+  for (let i = 0; i < chars.length; i += chunkSize) {
+    const chunk = chars.slice(i, i + chunkSize).join('');
+    yield chunk;
+    // 添加小延迟，让前端有时间渲染
+    await new Promise(resolve => setTimeout(resolve, 12));
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -394,18 +405,18 @@ export async function POST(request: NextRequest) {
         let fullContent = '';
         
         try {
-          // 直接开始 LLM 流式输出（不做联网搜索，提升速度）
-          const llmStream = client.stream(messages, {
+          // 统一使用假流式：先获取完整内容，再逐字发送
+          // 原因：doubao-seed-2-0-pro-260215 模型不支持真正的流式输出
+          const response = await client.invoke(messages, {
             model: 'doubao-seed-2-0-pro-260215',
             temperature: 0.7,
           });
           
-          for await (const chunk of llmStream) {
-            if (chunk.content) {
-              const text = chunk.content.toString();
-              fullContent += text;
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: text })}\n\n`));
-            }
+          fullContent = response.content;
+          
+          // 假流式发送：每次发送 5 个字符，间隔 12ms
+          for await (const chunk of fakeStreamGenerator(fullContent, 5)) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: chunk })}\n\n`));
           }
           
           // 发送完成信号
