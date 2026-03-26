@@ -75,133 +75,6 @@ const COLORS = {
   highlight: '#FA9D3B',  // 重点内容高亮色（黄色）
 };
 
-// Mermaid 图表渲染组件 - 使用动态导入避免 SSR 问题
-const MermaidDiagram = React.memo(({ code }: { code: string }) => {
-  const [svg, setSvg] = useState<string>('');
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let mounted = true;
-    
-    const renderDiagram = async () => {
-      try {
-        setLoading(true);
-        
-        // 动态导入 mermaid
-        const mermaid = (await import('mermaid')).default;
-        
-        // 初始化配置
-        mermaid.initialize({
-          startOnLoad: false,
-          theme: 'dark',
-          themeVariables: {
-            primaryColor: '#07C160',
-            primaryTextColor: '#FFFFFF',
-            primaryBorderColor: '#2C2C2C',
-            lineColor: '#3C3C3C',
-            secondaryColor: '#1A1A1A',
-            tertiaryColor: '#141414',
-            background: '#141414',
-            mainBkg: '#1A1A1A',
-            nodeBorder: '#3C3C3C',
-            clusterBkg: '#1A1A1A',
-            titleColor: '#FFFFFF',
-            edgeLabelBackground: '#1A1A1A',
-          },
-          flowchart: { curve: 'basis', padding: 15, useMaxWidth: true },
-          mindmap: { padding: 15, useMaxWidth: true },
-          sequence: { useMaxWidth: true },
-          securityLevel: 'loose',
-        });
-        
-        // 全面的代码清理，修复常见的 Mermaid 语法错误
-        let cleanedCode = code
-          // 1. 替换中文括号为英文
-          .replace(/[（）【】《》「」『』〈〉]/g, match => {
-            const map: Record<string, string> = {
-              '（': '(', '）': ')', '【': '[', '】': ']',
-              '《': '<', '》': '>', '「': '"', '」': '"',
-              '『': '"', '』': '"', '〈': '<', '〉': '>'
-            };
-            return map[match] || match;
-          })
-          // 2. 替换中文标点
-          .replace(/[，。！？、；：]/g, '')
-          // 3. 清理 subgraph 语法 - 确保格式正确
-          .replace(/subgraph\s+([^\[\n]+)/g, (match, name) => {
-            // 如果名称包含特殊字符，用引号包裹
-            const trimmed = name.trim();
-            if (trimmed && !trimmed.startsWith('"')) {
-              return `subgraph ${trimmed}`;
-            }
-            return match;
-          })
-          // 4. 修复节点定义中的中文 - 确保用引号包裹
-          .replace(/([A-Za-z_][A-Za-z0-9_]*)\s*\[\s*([^\]\[]*[^\x00-\xff][^\]\[]*)\s*\]/g, (match, id, label) => {
-            // 如果标签包含中文，确保正确格式
-            return `${id}["${label.trim()}"]`;
-          })
-          // 5. 移除多余的空格和换行
-          .replace(/\n\s*\n/g, '\n')
-          .trim();
-        
-        // 验证代码是否有效（基本检查）
-        if (!cleanedCode || cleanedCode.length < 10) {
-          if (mounted) {
-            setLoading(false);
-          }
-          return;
-        }
-        
-        const id = `mermaid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        const { svg } = await mermaid.render(id, cleanedCode);
-        
-        if (mounted) {
-          setSvg(svg);
-          setLoading(false);
-        }
-      } catch (err) {
-        // 静默失败，不显示错误
-        console.warn('Mermaid render skipped:', err);
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-    
-    if (code) {
-      renderDiagram();
-    }
-    
-    return () => {
-      mounted = false;
-    };
-  }, [code]);
-
-  // 错误时不显示任何内容
-  if (!svg) {
-    if (loading) {
-      return (
-        <div className="my-4 p-4 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#1A1A1A', border: '1px solid #2C2C2C', minHeight: '60px' }}>
-          <Loader2 className="w-4 h-4 animate-spin" style={{ color: COLORS.primary }} />
-        </div>
-      );
-    }
-    // 渲染失败时静默返回 null
-    return null;
-  }
-
-  return (
-    <div 
-      className="my-4 p-4 rounded-lg overflow-x-auto"
-      style={{ backgroundColor: '#1A1A1A', border: '1px solid #2C2C2C' }}
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
-  );
-});
-
-MermaidDiagram.displayName = 'MermaidDiagram';
-
 function HomeContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -682,30 +555,8 @@ function HomeContent() {
         continue;
       }
       
-      // 处理 mermaid 代码块
-      if (line.trim() === '```mermaid') {
-        const codeLines: string[] = [];
-        i++; // 跳过 ```mermaid 行
-        while (i < lines.length && lines[i].trim() !== '```') {
-          codeLines.push(lines[i]);
-          i++;
-        }
-        i++; // 跳过 ``` 行
-        
-        if (prefix && !prefixUsed) {
-          elements.push(<p key={key++} className="text-base leading-relaxed mb-2" style={{ color: '#A0A0A0' }}>{prefix}</p>);
-          prefixUsed = true;
-        }
-        
-        const mermaidCode = codeLines.join('\n');
-        elements.push(
-          <MermaidDiagram key={key++} code={mermaidCode} />
-        );
-        continue;
-      }
-      
-      // 处理普通代码块
-      if (line.trim().startsWith('```') && line.trim() !== '```mermaid') {
+      // 处理所有代码块（包括 mermaid，作为普通代码块渲染）
+      if (line.trim().startsWith('```')) {
         const lang = line.trim().slice(3);
         const codeLines: string[] = [];
         i++; // 跳过 ```lang 行
@@ -720,9 +571,10 @@ function HomeContent() {
           prefixUsed = true;
         }
         
+        const code = codeLines.join('\n');
         elements.push(
-          <pre key={key++} className="my-4 p-4 rounded-lg overflow-x-auto" style={{ backgroundColor: '#1A1A1A', border: '1px solid #2C2C2C' }}>
-            <code className="text-sm font-mono" style={{ color: '#A0A0A0' }}>{codeLines.join('\n')}</code>
+          <pre key={key++} className="my-3 p-3 rounded-lg text-sm overflow-x-auto" style={{ backgroundColor: '#141414', border: '1px solid #2C2C2C' }}>
+            <code style={{ color: '#A0A0A0' }}>{code}</code>
           </pre>
         );
         continue;
@@ -847,309 +699,11 @@ function HomeContent() {
     return elements;
   };
 
-  // 渲染对话历史
-  // 从内容中提取 Mermaid 代码 - 支持多种格式
-  const extractMermaidFromContent = (content: string): string | null => {
-    // 尝试多种正则格式
-    const patterns = [
-      /```mermaid\n([\s\S]*?)\n```/,           // 标准 markdown
-      /```mermaid\r?\n([\s\S]*?)\r?\n```/,     // 兼容不同换行
-      /```mermaid\s*\n([\s\S]*?)```/,          // 宽松匹配
-    ];
-    
-    for (const pattern of patterns) {
-      const match = content.match(pattern);
-      if (match && match[1]) {
-        const code = match[1].trim();
-        // 确保提取到的是有效的 mermaid 代码（至少包含 graph 或 flowchart 等关键字）
-        if (code.length > 10 && /^(graph|flowchart|sequenceDiagram|mindmap|gantt|classDiagram|stateDiagram)/m.test(code)) {
-          return code;
-        }
-      }
-    }
-    return null;
-  };
-
-  // 检查是否是流程图场景（Prompt梳理 或 代码梳理）- 现在使用结构化文本输出，不再需要流程图
-  const isFlowchartScenario = false; // selectedScenarios.includes('prompt') || selectedScenarios.includes('code');
-
-  // 流程图渲染组件 - 直接渲染 Mermaid，支持缩放、拖拽、下载
-  const FlowChart = ({ mermaidCode }: { mermaidCode: string }) => {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const [svg, setSvg] = useState<string>('');
-    const [scale, setScale] = useState(1);
-    const [isDraggingChart, setIsDraggingChart] = useState(false);
-    const [position, setPosition] = useState({ x: 0, y: 0 });
-    const [startPos, setStartPos] = useState({ x: 0, y: 0 });
-
-    // 渲染 Mermaid
-    useEffect(() => {
-      let mounted = true;
-      
-      const renderDiagram = async () => {
-        try {
-          const mermaid = (await import('mermaid')).default;
-          
-          mermaid.initialize({
-            startOnLoad: false,
-            theme: 'default',
-            themeVariables: {
-              primaryColor: '#E3F2FD',
-              primaryTextColor: '#1565C0',
-              primaryBorderColor: '#2196F3',
-              lineColor: '#90CAF9',
-              secondaryColor: '#FFF3E0',
-              tertiaryColor: '#E8F5E9',
-              background: '#FFFFFF',
-              mainBkg: '#F5F5F5',
-              nodeBorder: '#BDBDBD',
-              clusterBkg: '#FAFAFA',
-              titleColor: '#212121',
-              edgeLabelBackground: '#FFFFFF',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              fontSize: '13px',
-            },
-            flowchart: {
-              curve: 'basis',
-              padding: 15,
-              useMaxWidth: true,
-              htmlLabels: true,
-              rankSpacing: 60,
-              nodeSpacing: 35,
-              defaultRenderer: 'dagre-wrapper',
-            },
-            sequence: {
-              actorMargin: 50,
-              boxMargin: 10,
-              boxTextMargin: 5,
-              noteMargin: 10,
-              messageMargin: 35,
-            },
-            securityLevel: 'loose',
-          });
-          
-          // 清理代码 - 保留 br 标签用于换行
-          let cleanedCode = mermaidCode
-            .replace(/[（）【】《》「」『』〈〉]/g, match => {
-              const map: Record<string, string> = {
-                '（': '(', '）': ')', '【': '[', '】': ']',
-                '《': '<', '》': '>', '「': '"', '」': '"',
-                '『': '"', '』': '"', '〈': '<', '〉': '>'
-              };
-              return map[match] || match;
-            })
-            .trim();
-          
-          const id = `prompt-flowchart-${Date.now()}`;
-          const { svg: renderedSvg } = await mermaid.render(id, cleanedCode);
-          
-          if (mounted) {
-            setSvg(renderedSvg);
-          }
-        } catch (err) {
-          console.warn('Mermaid render error:', err);
-        }
-      };
-      
-      if (mermaidCode) {
-        renderDiagram();
-      }
-      
-      return () => {
-        mounted = false;
-      };
-    }, [mermaidCode]);
-
-    // 缩放控制
-    const handleZoomIn = () => setScale(prev => Math.min(prev + 0.2, 3));
-    const handleZoomOut = () => setScale(prev => Math.max(prev - 0.2, 0.3));
-    const handleReset = () => {
-      setScale(1);
-      setPosition({ x: 0, y: 0 });
-    };
-
-    // 拖拽控制
-    const handleMouseDown = (e: React.MouseEvent) => {
-      if (e.button !== 0) return;
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDraggingChart(true);
-      setStartPos({ x: e.clientX - position.x, y: e.clientY - position.y });
-    };
-
-    const handleMouseUp = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      setIsDraggingChart(false);
-    };
-
-    const handleMouseMove = (e: React.MouseEvent) => {
-      if (!isDraggingChart) return;
-      e.preventDefault();
-      e.stopPropagation();
-      setPosition({
-        x: e.clientX - startPos.x,
-        y: e.clientY - startPos.y
-      });
-    };
-
-    const handleMouseLeave = () => setIsDraggingChart(false);
-
-    // 下载图片
-    const handleDownload = () => {
-      if (!svg) return;
-      
-      // 创建 SVG blob
-      const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-      const svgUrl = URL.createObjectURL(svgBlob);
-      
-      // 下载 SVG
-      const downloadLink = document.createElement('a');
-      downloadLink.href = svgUrl;
-      downloadLink.download = `flowchart-${Date.now()}.svg`;
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
-      URL.revokeObjectURL(svgUrl);
-    };
-
-    return (
-      <div className="flex flex-col h-full">
-        {/* 工具栏 */}
-        <div className="flex items-center justify-between px-4 py-2 mb-2 bg-gray-100 rounded-lg border border-gray-200">
-          <div className="flex items-center gap-1 text-xs text-gray-500">
-            <Move className="w-4 h-4 mr-1" />
-            按住鼠标拖动
-          </div>
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={handleZoomOut}
-              className="p-1.5 rounded hover:bg-gray-200 transition-colors text-gray-600"
-              title="缩小"
-            >
-              <ZoomOut className="w-4 h-4" />
-            </button>
-            <span className="text-xs min-w-[50px] text-center text-gray-500">
-              {Math.round(scale * 100)}%
-            </span>
-            <button 
-              onClick={handleZoomIn}
-              className="p-1.5 rounded hover:bg-gray-200 transition-colors text-gray-600"
-              title="放大"
-            >
-              <ZoomIn className="w-4 h-4" />
-            </button>
-            <button 
-              onClick={handleReset}
-              className="p-1.5 rounded hover:bg-gray-200 transition-colors ml-2 text-gray-600"
-              title="重置"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
-            <button 
-              onClick={handleDownload}
-              className="flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-200 transition-colors ml-2 text-blue-600"
-              title="下载"
-            >
-              <Download className="w-4 h-4" />
-              <span className="text-xs">下载</span>
-            </button>
-          </div>
-        </div>
-        
-        {/* 画布区域 */}
-        {/* 画布区域 */}
-        <div 
-          className="flex-1 overflow-hidden relative bg-white rounded-xl border border-gray-200 shadow-sm"
-          style={{ 
-            cursor: isDraggingChart ? 'grabbing' : 'grab',
-          }}
-          onMouseDown={handleMouseDown}
-          onMouseUp={handleMouseUp}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={handleMouseLeave}
-        >
-          {svg ? (
-            <div
-              className="w-full h-full flex items-center justify-center"
-              style={{
-                transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                transition: isDraggingChart ? 'none' : 'transform 0.1s ease-out',
-              }}
-              dangerouslySetInnerHTML={{ __html: svg }}
-            />
-          ) : (
-            <div className="flex items-center justify-center h-full text-blue-600">
-              <Loader2 className="w-6 h-6 animate-spin" />
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  // 渲染流程图场景的内容
-  const renderFlowchartContent = (): React.ReactNode => {
-    if (!analysisResult) return null;
-    
-    const mermaidCode = extractMermaidFromContent(analysisResult);
-    
-    // 如果成功提取到 Mermaid 代码，渲染流程图
-    if (mermaidCode) {
-      return (
-        <div key="prompt-flowchart" className="flex-1 flex flex-col h-full">
-          <FlowChart mermaidCode={mermaidCode} />
-        </div>
-      );
-    }
-    
-    // 如果正在分析且还没提取到完整代码，显示加载状态
-    if (isAnalyzing) {
-      // 检查是否已经开始输出 mermaid 代码块
-      if (analysisResult.includes('```mermaid')) {
-        return (
-          <div className="flex items-center gap-2 text-base text-gray-500">
-            <Loader2 className="w-5 h-5 animate-spin" /><span>正在渲染流程图...</span>
-          </div>
-        );
-      }
-      return (
-        <div className="flex items-center gap-2 text-base text-gray-500">
-          <Loader2 className="w-5 h-5 animate-spin" /><span>生成流程图中...</span>
-        </div>
-      );
-    }
-    
-    // 分析完成但没有提取到有效 mermaid，尝试查找任何可能的代码块
-    const anyCodeBlock = analysisResult.match(/```(\w*)\n([\s\S]*?)```/);
-    if (anyCodeBlock && anyCodeBlock[2]) {
-      const code = anyCodeBlock[2].trim();
-      if (code.length > 10) {
-        return (
-          <div key="flowchart-fallback" className="flex-1 flex flex-col h-full">
-            <FlowChart mermaidCode={code} />
-          </div>
-        );
-      }
-    }
-    
-    // 最后兜底：显示提示信息
-    return (
-      <div className="rounded-xl p-5 bg-gray-50 border border-gray-200">
-        <div className="text-base text-gray-500">
-          流程图生成完成，但无法解析有效的图表代码。请尝试重新生成。
-        </div>
-      </div>
-    );
-  };
-
   const renderConversation = () => {
     const elements: React.ReactNode[] = [];
     
-    // 如果是流程图场景，使用特殊渲染
-    if (isFlowchartScenario && analysisResult) {
-      elements.push(renderFlowchartContent());
-    } else if (analysisResult) {
-      // 普通场景的渲染
+    // 渲染分析结果
+    if (analysisResult) {
       elements.push(
         <div key="main-answer" className="mb-6">
           <div className="rounded-xl p-5" style={{ backgroundColor: 'rgba(28, 28, 28, 0.6)', border: '1px solid rgba(44, 44, 44, 0.5)' }}>
@@ -1322,10 +876,7 @@ function HomeContent() {
                 
                 <Textarea 
                   ref={textareaRef} 
-                  placeholder={isFlowchartScenario 
-                    ? "粘贴你的 Prompt 内容...&#10;&#10;我会帮你梳理成可视化的流程图" 
-                    : "粘贴开发说的话...&#10;&#10;支持 Ctrl+V 粘贴截图"
-                  } 
+                  placeholder="粘贴开发说的话...&#10;&#10;支持 Ctrl+V 粘贴截图"
                   value={inputText} 
                   onChange={(e) => setInputText(e.target.value)}
                   className="flex-1 min-h-0 text-base resize-none overflow-y-auto rounded-lg"
@@ -1375,7 +926,7 @@ function HomeContent() {
               </div>
             )}
             
-            <div ref={scrollContainerRef} className={`flex-1 ${isFlowchartScenario ? 'overflow-hidden p-3' : 'overflow-y-auto p-6'}`}>
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6">
               {isLoadingRecord && (
                 <div className="flex items-center gap-2 text-base" style={{ color: '#666666' }}>
                   <Loader2 className="w-5 h-5 animate-spin" /><span>加载历史记录...</span>
@@ -1384,7 +935,7 @@ function HomeContent() {
 
               {!isLoadingRecord && (isAnalyzing || isFollowUp) && conversationHistory.length === 0 && (
                 <div className="flex items-center gap-2 text-base" style={{ color: '#666666' }}>
-                  <Loader2 className="w-5 h-5 animate-spin" /><span>{isFlowchartScenario ? '生成流程图中...' : '分析中...'}</span>
+                  <Loader2 className="w-5 h-5 animate-spin" /><span>分析中...</span>
                 </div>
               )}
 
@@ -1400,7 +951,7 @@ function HomeContent() {
 
               {/* 主要内容和对话历史 */}
               {!isLoadingRecord && conversationHistory.length > 0 && (
-                <div className={`text-base leading-relaxed ${isFlowchartScenario ? 'h-full flex flex-col overflow-hidden' : ''}`}>
+                <div className="text-base leading-relaxed">
                   {renderConversation()}
                 </div>
               )}
