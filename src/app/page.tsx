@@ -906,15 +906,15 @@ function HomeContent() {
               titleColor: '#FFFFFF',
               edgeLabelBackground: '#1A1A1A',
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              fontSize: '14px',
+              fontSize: '13px',
             },
             flowchart: {
               curve: 'basis',
-              padding: 25,
-              useMaxWidth: false,
+              padding: 15,
+              useMaxWidth: true,
               htmlLabels: true,
-              rankSpacing: 70,
-              nodeSpacing: 40,
+              rankSpacing: 50,
+              nodeSpacing: 30,
               defaultRenderer: 'dagre-wrapper',
             },
             sequence: {
@@ -1075,12 +1075,9 @@ function HomeContent() {
         >
           {svg ? (
             <div
+              className="w-full h-full flex items-center justify-center"
               style={{
-                position: 'absolute',
-                left: 0,
-                top: 0,
                 transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                transformOrigin: '0 0',
                 transition: isDraggingChart ? 'none' : 'transform 0.1s ease-out',
               }}
               dangerouslySetInnerHTML={{ __html: svg }}
