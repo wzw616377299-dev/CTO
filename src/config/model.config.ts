@@ -2,6 +2,7 @@
  * 模型配置中心
  * 
  * 更新日志：
+ * - 2025-03-26: 增加场景级模型选择，代码梳理使用 Kimi 模型
  * - 2025-03-23: 初始配置，使用 doubao-seed-2-0-pro-260215
  * 
  * 可用模型列表（按推荐程度排序）：
@@ -45,19 +46,51 @@ export const MODEL_CONFIG = {
     description: '豆包视觉模型 - 图像/视频理解',
     lastUpdated: '2024-08-15',
   },
+
+  // 代码理解 - 适合代码分析和梳理
+  code: {
+    model: 'kimi-k2-5-260127',
+    temperature: 0.3,
+    description: 'Kimi K2.5 - 代码理解专家',
+    lastUpdated: '2025-01-27',
+  },
+
+  // Prompt 分析 - 适合复杂推理
+  prompt: {
+    model: 'doubao-seed-2-0-pro-260215',
+    temperature: 0.5,
+    description: '豆包旗舰模型 - Prompt结构分析',
+    lastUpdated: '2025-02-15',
+  },
 } as const;
 
 // 当前生效的模型版本
 export const CURRENT_MODEL_VERSION = {
   primary: MODEL_CONFIG.primary.model,
   fallback: MODEL_CONFIG.fallback.model,
-  lastReviewDate: '2025-03-23',
-  nextReviewDate: '2025-03-24', // 每天检查
+  lastReviewDate: '2025-03-26',
+  nextReviewDate: '2025-03-27',
 };
 
 // 获取模型配置
-export function getModelConfig(type: 'primary' | 'fallback' | 'title' | 'vision' = 'primary') {
+export function getModelConfig(type: 'primary' | 'fallback' | 'title' | 'vision' | 'code' | 'prompt' = 'primary') {
   return MODEL_CONFIG[type];
+}
+
+// 根据场景获取模型配置
+export function getModelByScenario(scenario: string): { model: string; temperature: number } {
+  switch (scenario) {
+    case 'code':
+      return MODEL_CONFIG.code;
+    case 'prompt':
+      return MODEL_CONFIG.prompt;
+    case 'work':
+    case 'understand':
+    case 'concept':
+    case 'report':
+    default:
+      return MODEL_CONFIG.primary;
+  }
 }
 
 // 模型选择建议
@@ -79,4 +112,10 @@ export const MODEL_RECOMMENDATIONS = {
   
   // 快速响应、高并发
   fastResponse: 'doubao-seed-2-0-mini-260215',
+
+  // Prompt 结构分析
+  promptAnalysis: 'doubao-seed-2-0-pro-260215',
+
+  // 代码理解
+  codeAnalysis: 'kimi-k2-5-260127',
 };

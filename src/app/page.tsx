@@ -870,8 +870,8 @@ function HomeContent() {
     return null;
   };
 
-  // 检查是否是流程图场景（Prompt梳理 或 代码梳理）
-  const isFlowchartScenario = selectedScenarios.includes('prompt') || selectedScenarios.includes('code');
+  // 检查是否是流程图场景（Prompt梳理 或 代码梳理）- 现在使用结构化文本输出，不再需要流程图
+  const isFlowchartScenario = false; // selectedScenarios.includes('prompt') || selectedScenarios.includes('code');
 
   // 流程图渲染组件 - 直接渲染 Mermaid，支持缩放、拖拽、下载
   const FlowChart = ({ mermaidCode }: { mermaidCode: string }) => {
