@@ -847,11 +847,24 @@ function HomeContent() {
   };
 
   // 渲染对话历史
-  // 从内容中提取 Mermaid 代码
+  // 从内容中提取 Mermaid 代码 - 支持多种格式
   const extractMermaidFromContent = (content: string): string | null => {
-    const mermaidMatch = content.match(/```mermaid\n([\s\S]*?)\n```/);
-    if (mermaidMatch) {
-      return mermaidMatch[1].trim();
+    // 尝试多种正则格式
+    const patterns = [
+      /```mermaid\n([\s\S]*?)\n```/,           // 标准 markdown
+      /```mermaid\r?\n([\s\S]*?)\r?\n```/,     // 兼容不同换行
+      /```mermaid\s*\n([\s\S]*?)```/,          // 宽松匹配
+    ];
+    
+    for (const pattern of patterns) {
+      const match = content.match(pattern);
+      if (match && match[1]) {
+        const code = match[1].trim();
+        // 确保提取到的是有效的 mermaid 代码（至少包含 graph 或 flowchart 等关键字）
+        if (code.length > 10 && /^(graph|flowchart|sequenceDiagram|mindmap|gantt|classDiagram|stateDiagram)/m.test(code)) {
+          return code;
+        }
+      }
     }
     return null;
   };
@@ -1078,16 +1091,25 @@ function HomeContent() {
     
     const mermaidCode = extractMermaidFromContent(analysisResult);
     
+    // 如果成功提取到 Mermaid 代码，渲染流程图
     if (mermaidCode) {
       return (
-        <div key="prompt-flowchart" className="h-full flex flex-col flex-1">
+        <div key="prompt-flowchart" className="flex-1 flex flex-col h-full">
           <PromptFlowChart mermaidCode={mermaidCode} />
         </div>
       );
     }
     
-    // 如果没有提取到 Mermaid 代码，显示加载状态或原始内容
+    // 如果正在分析且还没提取到完整代码，显示加载状态
     if (isAnalyzing) {
+      // 检查是否已经开始输出 mermaid 代码块
+      if (analysisResult.includes('```mermaid')) {
+        return (
+          <div className="flex items-center gap-2 text-base" style={{ color: '#666666' }}>
+            <Loader2 className="w-5 h-5 animate-spin" /><span>正在渲染流程图...</span>
+          </div>
+        );
+      }
       return (
         <div className="flex items-center gap-2 text-base" style={{ color: '#666666' }}>
           <Loader2 className="w-5 h-5 animate-spin" /><span>生成流程图中...</span>
@@ -1095,13 +1117,24 @@ function HomeContent() {
       );
     }
     
-    // 显示原始内容
-    return (
-      <div key="main-answer" className="mb-6">
-        <div className="rounded-xl p-5" style={{ backgroundColor: 'rgba(28, 28, 28, 0.6)', border: '1px solid rgba(44, 44, 44, 0.5)' }}>
-          <div className="text-base leading-relaxed">
-            {renderMarkdown(analysisResult)}
+    // 分析完成但没有提取到有效 mermaid，尝试查找任何可能的代码块
+    const anyCodeBlock = analysisResult.match(/```(\w*)\n([\s\S]*?)```/);
+    if (anyCodeBlock && anyCodeBlock[2]) {
+      const code = anyCodeBlock[2].trim();
+      if (code.length > 10) {
+        return (
+          <div key="prompt-flowchart-fallback" className="flex-1 flex flex-col min-h-[400px]">
+            <PromptFlowChart mermaidCode={code} />
           </div>
+        );
+      }
+    }
+    
+    // 最后兜底：显示提示信息
+    return (
+      <div className="rounded-xl p-5" style={{ backgroundColor: 'rgba(28, 28, 28, 0.6)', border: '1px solid rgba(44, 44, 44, 0.5)' }}>
+        <div className="text-base" style={{ color: '#999999' }}>
+          流程图生成完成，但无法解析有效的图表代码。请尝试重新生成。
         </div>
       </div>
     );
@@ -1340,7 +1373,7 @@ function HomeContent() {
               </div>
             )}
             
-            <div ref={scrollContainerRef} className={`flex-1 ${isPromptScenario ? 'overflow-hidden p-2' : 'overflow-y-auto p-6'}`}>
+            <div ref={scrollContainerRef} className={`flex-1 ${isPromptScenario ? 'overflow-hidden p-3' : 'overflow-y-auto p-6'}`}>
               {isLoadingRecord && (
                 <div className="flex items-center gap-2 text-base" style={{ color: '#666666' }}>
                   <Loader2 className="w-5 h-5 animate-spin" /><span>加载历史记录...</span>
@@ -1365,7 +1398,7 @@ function HomeContent() {
 
               {/* 主要内容和对话历史 */}
               {!isLoadingRecord && conversationHistory.length > 0 && (
-                <div className={`text-base leading-relaxed ${isPromptScenario ? 'h-full flex flex-col' : ''}`}>
+                <div className={`text-base leading-relaxed ${isPromptScenario ? 'h-full flex flex-col overflow-hidden' : ''}`}>
                   {renderConversation()}
                 </div>
               )}
