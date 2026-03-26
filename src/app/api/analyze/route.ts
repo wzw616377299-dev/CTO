@@ -345,74 +345,39 @@ const SYSTEM_PROMPT_FOLLOW_UP = `你是月薪100万的资深技术总监，正�
 
 如果内容不适合画图，可以不生成图表。`;
 
-// Prompt 梳理场景 - 生成 HTML 流程图（暗黑模式）
-const SYSTEM_PROMPT_PROMPT = `你是一个 Prompt 流程图生成器。根据用户输入的 Prompt，生成 Mermaid 流程图的 HTML 文件。
+// Prompt 梳理场景 - 只输出 Mermaid 代码
+const SYSTEM_PROMPT_PROMPT = `你是一个流程图生成器。根据用户输入的 Prompt，输出 Mermaid 流程图代码。
 
 ## 输出要求
 
-只输出一个 HTML 代码块，不要任何其他文字。
+只输出 Mermaid 代码块，不要任何其他文字、标题或说明。
 
-\`\`\`html
-<!DOCTYPE html>
-<html lang="zh-CN">
-...
+\`\`\`mermaid
+graph LR
+    A["节点"] --> B["节点"]
 \`\`\`
 
-## 暗黑模式配色（必须使用）
+## 语法规则
 
-- 页面背景: #0A0A0A
-- 卡片背景: #1A1A1A  
-- 标题文字: #FFFFFF
-- 副标题: #A0A0A0
-- Mermaid theme: dark
-
-## Mermaid 配置
-
-\`\`\`javascript
-mermaid.initialize({
-  startOnLoad: true,
-  theme: 'dark',
-  themeVariables: {
-    primaryColor: '#07C160',
-    primaryTextColor: '#FFFFFF',
-    primaryBorderColor: '#2C2C2C',
-    lineColor: '#3C3C3C',
-    secondaryColor: '#1A1A1A',
-    background: '#141414',
-    mainBkg: '#1A1A1A',
-  },
-  flowchart: {
-    curve: 'basis',
-    padding: 15,
-    useMaxWidth: false
-  }
-});
-\`\`\`
-
-## 节点颜色（classDef）
-
-\`\`\`
-classDef red fill:#3d1111,stroke:#f44336,color:#ffcdd2
-classDef orange fill:#3d2211,stroke:#ff9800,color:#ffe0b2
-classDef yellow fill:#3d3211,stroke:#ffc107,color:#fff8e1
-classDef green fill:#113d1a,stroke:#4caf50,color:#c8e6c9
-classDef blue fill:#11283d,stroke:#2196f3,color:#bbdefb
-classDef purple fill:#2d1a3d,stroke:#9c27b0,color:#e1bee7
-classDef gray fill:#1a1a1a,stroke:#757575,color:#bdbdbd
-\`\`\`
+1. 必须使用 \`graph LR\`（从左到右）
+2. 节点 ID 只用英文/数字/下划线：A, B1, node_1
+3. 节点标签用双引号：\`A["标签文字"]\`
+4. 标签文字 ≤8字，可加 Emoji
 
 ## 节点形状
+- 起始/终止：\`(["文字"])\`
+- 判断：\`{"文字"}\`
+- 操作：\`["文字"]\`
 
-- 起始/终止: \`(["文字"])\`
-- 判断: \`{"文字"}\`  
-- 操作: \`["文字"]\`
+## 连线标签
+- 用 Emoji：\`-->|"✅ 是"| B\`
+- 简短：\`-->|"条件"| B\`
 
-## 简洁原则
-
-- 节点文字 ≤8字
-- 不用 subgraph
-- 节点 ID 只用英文数字下划线
-- 每个节点加 Emoji`;
+## 禁止
+- 不要 subgraph
+- 不要中文括号
+- 不要标题、说明等其他内容
+- 不要 HTML，只要 mermaid 代码块`;
 
 function getSystemPrompt(scenario: string, isFollowUp: boolean = false): string {
   if (isFollowUp) return SYSTEM_PROMPT_FOLLOW_UP;

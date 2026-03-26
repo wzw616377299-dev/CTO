@@ -847,16 +847,11 @@ function HomeContent() {
   };
 
   // 渲染对话历史
-  // 从内容中提取 HTML 代码块
-  const extractHtmlFromContent = (content: string): string | null => {
-    const htmlMatch = content.match(/```html\n([\s\S]*?)\n```/);
-    if (htmlMatch) {
-      return htmlMatch[1];
-    }
-    // 也尝试匹配没有语言标记的代码块
-    const codeMatch = content.match(/```\n([\s\S]*?)\n```/);
-    if (codeMatch && codeMatch[1].includes('<!DOCTYPE html>')) {
-      return codeMatch[1];
+  // 从内容中提取 Mermaid 代码
+  const extractMermaidFromContent = (content: string): string | null => {
+    const mermaidMatch = content.match(/```mermaid\n([\s\S]*?)\n```/);
+    if (mermaidMatch) {
+      return mermaidMatch[1].trim();
     }
     return null;
   };
@@ -864,28 +859,82 @@ function HomeContent() {
   // 检查是否是 Prompt 梳理场景
   const isPromptScenario = selectedScenarios.includes('prompt');
 
-  // Prompt 流程图渲染组件 - 支持缩放、拖拽、下载
-  const PromptFlowChart = ({ htmlContent }: { htmlContent: string }) => {
+  // Prompt 流程图渲染组件 - 直接渲染 Mermaid，支持缩放、拖拽、下载
+  const PromptFlowChart = ({ mermaidCode }: { mermaidCode: string }) => {
     const containerRef = useRef<HTMLDivElement>(null);
-    const contentRef = useRef<HTMLDivElement>(null);
+    const [svg, setSvg] = useState<string>('');
     const [scale, setScale] = useState(1);
     const [isDraggingChart, setIsDraggingChart] = useState(false);
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [startPos, setStartPos] = useState({ x: 0, y: 0 });
-    const [iframeHeight, setIframeHeight] = useState(600);
 
-    // 计算实际可用高度
+    // 渲染 Mermaid
     useEffect(() => {
-      const updateHeight = () => {
-        if (containerRef.current) {
-          const rect = containerRef.current.getBoundingClientRect();
-          setIframeHeight(Math.max(500, window.innerHeight - 200));
+      let mounted = true;
+      
+      const renderDiagram = async () => {
+        try {
+          const mermaid = (await import('mermaid')).default;
+          
+          mermaid.initialize({
+            startOnLoad: false,
+            theme: 'dark',
+            themeVariables: {
+              primaryColor: '#07C160',
+              primaryTextColor: '#FFFFFF',
+              primaryBorderColor: '#2C2C2C',
+              lineColor: '#3C3C3C',
+              secondaryColor: '#1A1A1A',
+              tertiaryColor: '#141414',
+              background: '#141414',
+              mainBkg: '#1A1A1A',
+              nodeBorder: '#3C3C3C',
+              clusterBkg: '#1A1A1A',
+              titleColor: '#FFFFFF',
+              edgeLabelBackground: '#1A1A1A',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            },
+            flowchart: {
+              curve: 'basis',
+              padding: 20,
+              useMaxWidth: false,
+              htmlLabels: true,
+            },
+            securityLevel: 'loose',
+          });
+          
+          // 清理代码
+          let cleanedCode = mermaidCode
+            .replace(/[（）【】《》「」『』〈〉]/g, match => {
+              const map: Record<string, string> = {
+                '（': '(', '）': ')', '【': '[', '】': ']',
+                '《': '<', '》': '>', '「': '"', '」': '"',
+                '『': '"', '』': '"', '〈': '<', '〉': '>'
+              };
+              return map[match] || match;
+            })
+            .replace(/[，。！？、；：]/g, '')
+            .trim();
+          
+          const id = `prompt-flowchart-${Date.now()}`;
+          const { svg: renderedSvg } = await mermaid.render(id, cleanedCode);
+          
+          if (mounted) {
+            setSvg(renderedSvg);
+          }
+        } catch (err) {
+          console.warn('Mermaid render error:', err);
         }
       };
-      updateHeight();
-      window.addEventListener('resize', updateHeight);
-      return () => window.removeEventListener('resize', updateHeight);
-    }, []);
+      
+      if (mermaidCode) {
+        renderDiagram();
+      }
+      
+      return () => {
+        mounted = false;
+      };
+    }, [mermaidCode]);
 
     // 缩放控制
     const handleZoomIn = () => setScale(prev => Math.min(prev + 0.2, 3));
@@ -897,16 +946,22 @@ function HomeContent() {
 
     // 拖拽控制
     const handleMouseDown = (e: React.MouseEvent) => {
-      if (e.button !== 0) return; // 只响应左键
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
       setIsDraggingChart(true);
       setStartPos({ x: e.clientX - position.x, y: e.clientY - position.y });
     };
 
-    const handleMouseUp = () => setIsDraggingChart(false);
+    const handleMouseUp = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setIsDraggingChart(false);
+    };
 
     const handleMouseMove = (e: React.MouseEvent) => {
       if (!isDraggingChart) return;
       e.preventDefault();
+      e.stopPropagation();
       setPosition({
         x: e.clientX - startPos.x,
         y: e.clientY - startPos.y
@@ -916,58 +971,22 @@ function HomeContent() {
     const handleMouseLeave = () => setIsDraggingChart(false);
 
     // 下载图片
-    const handleDownload = async () => {
-      try {
-        // 创建一个 canvas 来截图
-        const iframe = document.querySelector('#prompt-iframe') as HTMLIFrameElement;
-        if (!iframe || !iframe.contentDocument) return;
-        
-        // 使用 html2canvas 或简单的截图方式
-        // 由于安全限制，我们使用另一种方式：直接下载 SVG
-        const svgElement = iframe.contentDocument.querySelector('svg');
-        if (svgElement) {
-          const svgData = new XMLSerializer().serializeToString(svgElement);
-          const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-          const svgUrl = URL.createObjectURL(svgBlob);
-          
-          const downloadLink = document.createElement('a');
-          downloadLink.href = svgUrl;
-          downloadLink.download = `prompt-flowchart-${Date.now()}.svg`;
-          document.body.appendChild(downloadLink);
-          downloadLink.click();
-          document.body.removeChild(downloadLink);
-          URL.revokeObjectURL(svgUrl);
-        }
-      } catch (error) {
-        console.error('下载失败:', error);
-        // 备用方案：下载整个 HTML
-        const blob = new Blob([htmlContent], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `prompt-flowchart-${Date.now()}.html`;
-        a.click();
-        URL.revokeObjectURL(url);
-      }
+    const handleDownload = () => {
+      if (!svg) return;
+      
+      // 创建 SVG blob
+      const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+      const svgUrl = URL.createObjectURL(svgBlob);
+      
+      // 下载 SVG
+      const downloadLink = document.createElement('a');
+      downloadLink.href = svgUrl;
+      downloadLink.download = `prompt-flowchart-${Date.now()}.svg`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      URL.revokeObjectURL(svgUrl);
     };
-
-    // 将 HTML 中的亮色主题替换为暗黑主题
-    const darkHtmlContent = htmlContent
-      .replace(/#f5f7fa/gi, '#0A0A0A')           // 页面背景
-      .replace(/#ffffff/gi, '#1A1A1A')           // 白色背景
-      .replace(/#fff/gi, '#1A1A1A')              // 白色
-      .replace(/#1a1a2e/gi, '#FFFFFF')           // 深色标题文字
-      .replace(/#666/gi, '#A0A0A0')              // 副标题文字
-      .replace(/box-shadow:[^;]+;/gi, 'box-shadow: 0 2px 12px rgba(0,0,0,0.4);') // 阴影
-      .replace(/background:\s*white/gi, 'background: #1A1A1A')
-      .replace(/background:\s*#fff/gi, 'background: #1A1A1A')
-      // Mermaid 主题
-      .replace(/theme:\s*'default'/gi, "theme: 'dark'")
-      .replace(/"primaryColor":\s*"#[^"]*"/gi, '"primaryColor": "#07C160"')
-      .replace(/"primaryTextColor":\s*"#[^"]*"/gi, '"primaryTextColor": "#FFFFFF"')
-      .replace(/"primaryBorderColor":\s*"#[^"]*"/gi, '"primaryBorderColor": "#2C2C2C"')
-      .replace(/"lineColor":\s*"#[^"]*"/gi, '"lineColor": "#3C3C3C"')
-      .replace(/"background":\s*"#[^"]*"/gi, '"background": "#141414"');
 
     return (
       <div className="flex flex-col h-full">
@@ -1019,42 +1038,35 @@ function HomeContent() {
         
         {/* 画布区域 */}
         <div 
-          ref={containerRef}
-          className="flex-1 overflow-hidden cursor-grab active:cursor-grabbing relative"
+          className="flex-1 overflow-hidden relative"
           style={{ 
             backgroundColor: '#0A0A0A',
             borderRadius: '12px',
             border: '1px solid #2C2C2C',
-            minHeight: `${iframeHeight}px`,
+            cursor: isDraggingChart ? 'grabbing' : 'grab',
           }}
           onMouseDown={handleMouseDown}
           onMouseUp={handleMouseUp}
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
         >
-          <div 
-            ref={contentRef}
-            className="absolute"
-            style={{
-              transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-              transformOrigin: 'center center',
-              transition: isDraggingChart ? 'none' : 'transform 0.1s ease-out',
-            }}
-          >
-            <iframe
-              id="prompt-iframe"
-              srcDoc={darkHtmlContent}
-              className="border-none"
-              style={{ 
-                width: '1000px',
-                height: `${iframeHeight}px`,
-                backgroundColor: '#0A0A0A',
-                pointerEvents: 'none', // 禁用 iframe 内的鼠标事件，让父容器处理拖拽
+          {svg ? (
+            <div
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+                transformOrigin: '0 0',
+                transition: isDraggingChart ? 'none' : 'transform 0.1s ease-out',
               }}
-              sandbox="allow-scripts"
-              title="Prompt 流程图"
+              dangerouslySetInnerHTML={{ __html: svg }}
             />
-          </div>
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <Loader2 className="w-6 h-6 animate-spin" style={{ color: '#07C160' }} />
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1064,17 +1076,17 @@ function HomeContent() {
   const renderPromptContent = (): React.ReactNode => {
     if (!analysisResult) return null;
     
-    const htmlContent = extractHtmlFromContent(analysisResult);
+    const mermaidCode = extractMermaidFromContent(analysisResult);
     
-    if (htmlContent) {
+    if (mermaidCode) {
       return (
         <div key="prompt-flowchart" className="h-full flex flex-col flex-1">
-          <PromptFlowChart htmlContent={htmlContent} />
+          <PromptFlowChart mermaidCode={mermaidCode} />
         </div>
       );
     }
     
-    // 如果没有提取到 HTML，显示加载状态或原始内容
+    // 如果没有提取到 Mermaid 代码，显示加载状态或原始内容
     if (isAnalyzing) {
       return (
         <div className="flex items-center gap-2 text-base" style={{ color: '#666666' }}>
