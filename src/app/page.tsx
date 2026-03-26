@@ -37,6 +37,7 @@ const SCENARIOS = [
   { id: 'understand', label: '技术理解' },
   { id: 'concept', label: '概念梳理' },
   { id: 'report', label: '汇报框架' },
+  { id: 'prompt', label: 'Prompt梳理' },
 ];
 
 const MAX_IMAGES = 20;
@@ -841,11 +842,127 @@ function HomeContent() {
   };
 
   // 渲染对话历史
+  // 从内容中提取 HTML 代码块
+  const extractHtmlFromContent = (content: string): string | null => {
+    const htmlMatch = content.match(/```html\n([\s\S]*?)\n```/);
+    if (htmlMatch) {
+      return htmlMatch[1];
+    }
+    // 也尝试匹配没有语言标记的代码块
+    const codeMatch = content.match(/```\n([\s\S]*?)\n```/);
+    if (codeMatch && codeMatch[1].includes('<!DOCTYPE html>')) {
+      return codeMatch[1];
+    }
+    return null;
+  };
+
+  // 检查是否是 Prompt 梳理场景
+  const isPromptScenario = selectedScenarios.includes('prompt');
+
+  // Prompt 流程图渲染组件
+  const PromptFlowChart = ({ htmlContent }: { htmlContent: string }) => {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [isDraggingChart, setIsDraggingChart] = useState(false);
+    const [startX, setStartX] = useState(0);
+    const [scrollLeft, setScrollLeft] = useState(0);
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+      if (!containerRef.current) return;
+      setIsDraggingChart(true);
+      setStartX(e.pageX - containerRef.current.offsetLeft);
+      setScrollLeft(containerRef.current.scrollLeft);
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingChart(false);
+    };
+
+    const handleMouseMove = (e: React.MouseEvent) => {
+      if (!isDraggingChart || !containerRef.current) return;
+      e.preventDefault();
+      const x = e.pageX - containerRef.current.offsetLeft;
+      const walk = (x - startX) * 1.5; // 滚动速度
+      containerRef.current.scrollLeft = scrollLeft - walk;
+    };
+
+    const handleMouseLeave = () => {
+      setIsDraggingChart(false);
+    };
+
+    return (
+      <div 
+        ref={containerRef}
+        className="w-full overflow-x-auto cursor-grab active:cursor-grabbing"
+        style={{ 
+          backgroundColor: '#0A0A0A',
+          borderRadius: '12px',
+          border: '1px solid #2C2C2C',
+          minHeight: '400px',
+          maxHeight: '70vh',
+        }}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+      >
+        <iframe
+          srcDoc={htmlContent}
+          className="w-full h-full min-h-[400px]"
+          style={{ 
+            border: 'none',
+            minWidth: '800px',
+            backgroundColor: '#f5f7fa',
+          }}
+          sandbox="allow-scripts"
+          title="Prompt 流程图"
+        />
+      </div>
+    );
+  };
+
+  // 渲染 Prompt 梳理场景的内容
+  const renderPromptContent = (): React.ReactNode => {
+    if (!analysisResult) return null;
+    
+    const htmlContent = extractHtmlFromContent(analysisResult);
+    
+    if (htmlContent) {
+      return (
+        <div key="prompt-flowchart" className="mb-6">
+          <PromptFlowChart htmlContent={htmlContent} />
+        </div>
+      );
+    }
+    
+    // 如果没有提取到 HTML，显示加载状态或原始内容
+    if (isAnalyzing) {
+      return (
+        <div className="flex items-center gap-2 text-base" style={{ color: '#666666' }}>
+          <Loader2 className="w-5 h-5 animate-spin" /><span>生成流程图中...</span>
+        </div>
+      );
+    }
+    
+    // 显示原始内容
+    return (
+      <div key="main-answer" className="mb-6">
+        <div className="rounded-xl p-5" style={{ backgroundColor: 'rgba(28, 28, 28, 0.6)', border: '1px solid rgba(44, 44, 44, 0.5)' }}>
+          <div className="text-base leading-relaxed">
+            {renderMarkdown(analysisResult)}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderConversation = () => {
     const elements: React.ReactNode[] = [];
     
-    // 渲染第一次回答（使用 analysisResult 支持流式输出）- 第一次不需要"老陈"标签
-    if (analysisResult) {
+    // 如果是 Prompt 梳理场景，使用特殊渲染
+    if (isPromptScenario && analysisResult) {
+      elements.push(renderPromptContent());
+    } else if (analysisResult) {
+      // 普通场景的渲染
       elements.push(
         <div key="main-answer" className="mb-6">
           <div className="rounded-xl p-5" style={{ backgroundColor: 'rgba(28, 28, 28, 0.6)', border: '1px solid rgba(44, 44, 44, 0.5)' }}>
@@ -949,12 +1066,12 @@ function HomeContent() {
               {/* Scenario - 多选 */}
               <div className="mb-5">
                 <div className="text-xs mb-2 uppercase tracking-wider" style={{ color: '#4A4A4A' }}>场景选择</div>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {SCENARIOS.map((s) => (
                     <button 
                       key={s.id} 
                       onClick={() => toggleScenario(s.id)}
-                      className="flex-1 py-2 text-sm rounded-lg transition-all"
+                      className="py-2 text-sm rounded-lg transition-all"
                       style={selectedScenarios.includes(s.id) 
                         ? { backgroundColor: 'rgba(7, 193, 96, 0.1)', color: COLORS.primary, border: '1px solid rgba(7, 193, 96, 0.5)', boxShadow: '0 0 10px rgba(7, 193, 96, 0.1)' }
                         : { backgroundColor: '#141414', color: '#666666', border: '1px solid #2C2C2C' }
@@ -1018,7 +1135,10 @@ function HomeContent() {
                 
                 <Textarea 
                   ref={textareaRef} 
-                  placeholder="粘贴开发说的话...&#10;&#10;支持 Ctrl+V 粘贴截图" 
+                  placeholder={isPromptScenario 
+                    ? "粘贴你的 Prompt 内容...&#10;&#10;我会帮你梳理成可视化的流程图" 
+                    : "粘贴开发说的话...&#10;&#10;支持 Ctrl+V 粘贴截图"
+                  } 
                   value={inputText} 
                   onChange={(e) => setInputText(e.target.value)}
                   className="flex-1 min-h-0 text-base resize-none overflow-y-auto rounded-lg"
