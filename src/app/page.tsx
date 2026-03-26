@@ -1230,7 +1230,7 @@ function HomeContent() {
 
       {/* Header */}
       <header className="shrink-0" style={{ backgroundColor: '#0A0A0A', borderBottom: '1px solid #1A1A1A' }}>
-        <div className="max-w-[1440px] mx-auto px-6 h-14 flex items-center justify-between">
+        <div className="max-w-[1800px] mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img 
               src="/avatar.png"
@@ -1254,7 +1254,7 @@ function HomeContent() {
       </header>
 
       <main className="flex-1 flex overflow-hidden justify-center">
-        <div className="w-full max-w-[1440px] flex">
+        <div className="w-full max-w-[1800px] flex">
           {/* Left: Input */}
           <div className="w-[420px] shrink-0 flex flex-col" style={{ backgroundColor: '#121212', borderRight: '1px solid #1A1A1A' }}>
             <div className="p-5 flex-1 flex flex-col min-h-0">

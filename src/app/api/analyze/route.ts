@@ -376,25 +376,79 @@ classDef special fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px,color:#6a1b9a
 - 操作/流程节点：\`["📋 执行操作"]\` - 使用矩形
 - 输出节点：\`["✅ 输出结果"]\` - 使用矩形
 
-### 4. 节点内容规范
-- 判断节点必须包含：编号 + 条件问题 + 示例说明
-  - 示例：\`{"① 风险检测？<br/>涉政/色情/辱骂"}\`
-- 操作节点必须包含：Emoji + 动作描述 + 补充说明
-  - 示例：\`["🚫 输出拦截<br/>type: 风险<br/>【结束】"]\`
-- 使用 \`<br/>\` 换行，使节点内容更丰富
+### 4. 节点内容规范【核心】
 
-### 5. 连线标签
+#### 判断节点 - 必须包含3行内容：
+第1行：编号 + 判断问题
+第2行：具体条件说明（用/分隔多个条件）
+第3行：示例关键词（可选，帮助理解）
+
+示例：
+\`{"① 风险词检测？<br/>涉政/色情/辱骂<br/>暴力/谣言等"}\`
+
+#### 操作/处理节点 - 必须包含：
+第1行：Emoji + 动作名称
+第2行：输出字段 type/intent/action 等
+第3行：具体内容说明
+第4行：【结束】或 → 下一步
+
+示例：
+\`["🚫 输出拦截<br/>type: risk<br/>content: 风险类别<br/>【拦截结束】"]\`
+
+#### 输出结果节点 - 必须详细说明：
+必须包含以下字段：
+- type: 输出类型（明确/模糊/风险等）
+- intent: 意图ID或意图名称
+- content: 输出内容或模板
+- action: 后续动作（结束/转人工/反问等）
+
+示例：
+\`["✅ 明确匹配<br/>type: clear<br/>intent: account_login<br/>content: 账号登录指引<br/>【结束】"]\`
+
+#### 判断分支说明节点：
+对于复杂的判断逻辑，需要在连线或节点中说明：
+- 匹配条件：关键词/正则/语义相似度
+- 输出格式：JSON字段说明
+- 处理动作：回复/转接/记录等
+
+### 5. 流程设计原则
+
+#### 优先级编号
+用数字编号标识优先级：①②③④⑤⑥⑦⑧⑨⑩
+
+#### 判断分支
+- 每个判断节点必须有"✅ 是"和"❌ 否"两个分支
+- 复杂判断可以有多个分支（如：唯一匹配/多个匹配/无匹配）
+
+#### 处理流程节点
+对于复杂的处理流程，使用流程块节点：
+\`["⑦ 标准匹配流程<br/>─────────<br/>1⃣ 提取核心意图<br/>2⃣ 业务范围判断<br/>3⃣ 逐个意图匹配<br/>4⃣ 输出结果"]\`
+
+#### 子流程引用
+使用节点引用表示跳转：
+\`["📋 提取业务问题<br/>→ 进入标准匹配 ⑦"]\`
+然后在代码中通过节点ID关联
+
+### 6. 输出字段规范
+
+根据不同场景，节点必须包含对应字段：
+
+| 节点类型 | 必须字段 | 说明 |
+|---------|---------|------|
+| 风险拦截 | type, content | type=risk, content=风险类别 |
+| 情绪安抚 | type, action | type=emotion, action=安抚话术 |
+| 意图识别 | type, intent, score | type=clear/fuzzy, intent=意图ID |
+| 业务处理 | type, content, action | type=answer, content=回复内容 |
+| 转人工 | type, reason | type=transfer, reason=转人工原因 |
+| 模糊反问 | type, content, examples | type=fuzzy, content=反问话术 |
+
+### 7. 连线标签
 - 使用 Emoji + 简短文字：\`-->|"✅ 是"| B\`
 - 否定分支：\`-->|"❌ 否"| C\`
-- 默认分支可省略标签
+- 条件分支：\`-->|"✅ 唯一匹配"| D\`
+- 特殊情况：\`-->|"❌ 含新信息"| E\`
 
-### 6. 流程设计原则
-- 用数字编号标识优先级：①②③④⑤⑥
-- 每个判断节点后必须有明确的"是/否"分支
-- 相同类型的节点使用相同样式（:::className）
-- 复杂流程可使用子流程节点引用
-
-### 7. 禁止事项
+### 8. 禁止事项
 - 不要使用 subgraph
 - 不要使用中文括号（）【】
 - 不要输出 mermaid 代码块之外的任何内容
@@ -404,6 +458,7 @@ classDef special fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px,color:#6a1b9a
 
 \`\`\`mermaid
 graph LR
+    %% 样式定义
     classDef startEnd fill:#e8f4f8,stroke:#2196F3,stroke-width:2px,color:#1565C0
     classDef decision fill:#fafafa,stroke:#757575,stroke-width:1px,color:#424242
     classDef process fill:#e3f2fd,stroke:#2196f3,stroke-width:2px,color:#1565c0
@@ -411,15 +466,27 @@ graph LR
     classDef error fill:#ffcdd2,stroke:#d32f2f,stroke-width:2px,color:#b71c1c
 
     START(["🎧 用户输入消息"]):::startEnd
-    
-    START --> D1{"① 风险词检测？<br/>涉政/色情/辱骂"}:::decision
-    D1 -- "✅ 是" --> R1["🚫 输出拦截<br/>type: 风险<br/>【结束】"]:::error
-    D1 -- "❌ 否" --> D2{"② 业务匹配？<br/>关键词识别"}:::decision
-    D2 -- "✅ 唯一匹配" --> R2["✅ 输出结果<br/>type: 明确<br/>intent: xxx"]:::success
-    D2 -- "❌ 无匹配" --> R3["❓ 输出反问<br/>type: 模糊<br/>引导用户"]:::process
+
+    %% ① 风险检测
+    START --> D1{"① 风险词检测？<br/>涉政/色情/辱骂<br/>暴力/谣言等"}:::decision
+    D1 -- "✅ 是" --> R1["🚫 输出拦截<br/>type: risk<br/>content: 风险类别<br/>action: 拒绝回复<br/>【拦截结束】"]:::error
+
+    %% ② 情绪判断
+    D1 -- "❌ 否" --> D2{"② 情绪激动？<br/>辱骂/催促/威胁"}:::decision
+    D2 -- "✅ 是" --> EMO_CHECK{"含业务意图？<br/>提取有效信息"}:::decision
+    EMO_CHECK -- "✅ 有业务意图" --> EMO_YES["😊 先安抚情绪<br/>type: emotion<br/>action: 安抚+提取<br/>→ 进入匹配流程"]:::process
+    EMO_CHECK -- "❌ 纯发泄" --> EMO_NO["😊 安抚回复<br/>type: emotion<br/>content: 安抚话术<br/>action: 引导说出问题<br/>【结束】"]:::process
+
+    %% ③ 业务匹配
+    D2 -- "❌ 否" --> MATCH["③ 业务匹配流程<br/>─────────<br/>1⃣ 提取核心意图<br/>2⃣ 关键词匹配<br/>3⃣ 语义相似度<br/>4⃣ 输出结果"]:::process
+
+    MATCH --> MATCH_R{"匹配结果？<br/>计算相似度"}:::decision
+    MATCH_R -- "✅ 唯一匹配<br/>score>0.8" --> OUT_YES["✅ 明确输出<br/>type: clear<br/>intent: 意图ID<br/>content: 标准回复<br/>【结束】"]:::success
+    MATCH_R -- "❓ 多个候选<br/>0.5<score<0.8" --> OUT_FUZZY["❓ 模糊反问<br/>type: fuzzy<br/>content: 反问话术<br/>examples: 候选列表<br/>【等待用户澄清】"]:::process
+    MATCH_R -- "❌ 无匹配<br/>score<0.5" --> OUT_NONE["💭 闲聊引导<br/>type: unknown<br/>content: 引导话术<br/>action: 引导回业务<br/>【结束】"]:::process
 \`\`\`
 
-请根据用户输入的 Prompt 内容，生成专业、细致的流程图。`;
+请根据用户输入的 Prompt 内容，生成专业、细致的流程图，每个节点都要包含详细的输出字段说明。`;
 
 function getSystemPrompt(scenario: string, isFollowUp: boolean = false): string {
   if (isFollowUp) return SYSTEM_PROMPT_FOLLOW_UP;
