@@ -19,7 +19,8 @@ import {
   ZoomOut,
   Download,
   RotateCcw,
-  Move
+  Move,
+  FolderDown
 } from 'lucide-react';
 import { analyzeApi, uploadApi, ocrApi, getUserId, recordsApi } from '@/lib/api';
 import Link from 'next/link';
@@ -99,6 +100,9 @@ function HomeContent() {
   
   // 用户滚动状态
   const [userScrolled, setUserScrolled] = useState(false);
+  
+  // 下载代码状态
+  const [isDownloadingCode, setIsDownloadingCode] = useState(false);
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -452,6 +456,38 @@ function HomeContent() {
     setTimeout(() => setCopiedText(null), 2000);
   };
 
+  // 下载项目代码
+  const handleDownloadCode = async () => {
+    setIsDownloadingCode(true);
+    try {
+      const response = await fetch('/api/download-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.downloadUrl) {
+        // 使用 fetch + blob 模式下载
+        const fileResponse = await fetch(data.downloadUrl);
+        const blob = await fileResponse.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = data.fileName;
+        link.click();
+        window.URL.revokeObjectURL(blobUrl);
+      } else {
+        alert('下载失败：' + (data.error || '未知错误'));
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('下载失败，请稍后重试');
+    } finally {
+      setIsDownloadingCode(false);
+    }
+  };
+
   // Markdown 渲染
   const renderMarkdown = (content: string, prefix?: React.ReactNode): React.ReactNode => {
     if (!content) return null;
@@ -789,13 +825,28 @@ function HomeContent() {
               <span className="text-xs ml-2" style={{ color: '#4A4A4A' }}>CTO</span>
             </div>
           </div>
-          <Link href="/history" className="group">
-            <Button variant="ghost" size="sm" className="gap-2 border border-transparent transition-all" style={{ color: '#666666' }} 
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="gap-2 border border-transparent transition-all" 
+              style={{ color: '#666666' }} 
+              onClick={handleDownloadCode}
+              disabled={isDownloadingCode}
               onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#2C2C2C'; e.currentTarget.style.color = '#FFFFFF'; e.currentTarget.style.backgroundColor = '#1A1A1A'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.color = '#666666'; e.currentTarget.style.backgroundColor = 'transparent'; }}>
-              <Clock className="w-4 h-4" />历史记录
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.color = '#666666'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+            >
+              {isDownloadingCode ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderDown className="w-4 h-4" />}
+              {isDownloadingCode ? '打包中...' : '下载代码'}
             </Button>
-          </Link>
+            <Link href="/history" className="group">
+              <Button variant="ghost" size="sm" className="gap-2 border border-transparent transition-all" style={{ color: '#666666' }} 
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#2C2C2C'; e.currentTarget.style.color = '#FFFFFF'; e.currentTarget.style.backgroundColor = '#1A1A1A'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.color = '#666666'; e.currentTarget.style.backgroundColor = 'transparent'; }}>
+                <Clock className="w-4 h-4" />历史记录
+              </Button>
+            </Link>
+          </div>
         </div>
       </header>
 
