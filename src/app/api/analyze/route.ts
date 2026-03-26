@@ -345,114 +345,253 @@ const SYSTEM_PROMPT_FOLLOW_UP = `你是月薪100万的资深技术总监，正�
 
 如果内容不适合画图，可以不生成图表。`;
 
-// Prompt 梳理场景 - 输出详细的 Mermaid 流程图
-const SYSTEM_PROMPT_PROMPT = `你是一个专业流程图生成器。根据用户输入的 Prompt，生成紧凑、专业、能在单屏展示的 Mermaid 流程图代码。
+// Prompt 梳理场景 - 输出非常详细的 Mermaid 流程图，帮助理解 AI 思考结构
+const SYSTEM_PROMPT_PROMPT = `你是一个专业流程图生成器。根据用户输入的 Prompt，生成非常详细、完整的 Mermaid 流程图代码，帮助用户理解 AI 的思考结构和决策逻辑。
 
 ## 输出要求
 
 只输出 Mermaid 代码块，不要任何其他文字、标题或说明。
 
-## 核心原则：紧凑布局，单屏展示
+## 核心原则：详细展示 AI 思考过程
 
 ### 1. 图表方向
-使用 \`graph TB\`（从上到下布局），更利于单屏展示。
+使用 \`graph LR\`（从左到右布局），便于阅读理解。
 
 ### 2. 样式定义（classDef）
-必须在代码开头定义节点样式：
+必须在代码开头定义丰富的节点样式：
 
 \`\`\`
 classDef startEnd fill:#e8f4f8,stroke:#2196F3,stroke-width:2px,color:#1565C0
-classDef decision fill:#fafafa,stroke:#757575,stroke-width:1px,color:#424242
-classDef process fill:#e3f2fd,stroke:#2196f3,stroke-width:2px,color:#1565c0
-classDef success fill:#c8e6c9,stroke:#388e3c,stroke-width:2px,color:#1b5e20
-classDef warning fill:#fff3e0,stroke:#ff9800,stroke-width:2px,color:#e65100
-classDef error fill:#ffcdd2,stroke:#d32f2f,stroke-width:2px,color:#b71c1c
+classDef decision fill:#fff8e1,stroke:#FFC107,stroke-width:2px,color:#F57F17
+classDef process fill:#e3f2fd,stroke:#2196F3,stroke-width:2px,color:#1565C0
+classDef success fill:#c8e6c9,stroke:#4CAF50,stroke-width:2px,color:#2E7D32
+classDef warning fill:#fff3e0,stroke:#FF9800,stroke-width:2px,color:#E65100
+classDef error fill:#ffcdd2,stroke:#F44336,stroke-width:2px,color:#C62828
+classDef special fill:#f3e5f5,stroke:#9C27B0,stroke-width:2px,color:#6A1B9A
 \`\`\`
 
-### 3. 节点内容精简规范【重要】
+### 3. 节点内容详细规范【核心】
 
-#### 判断节点 - 最多2行：
-第1行：编号 + 核心判断问题
-第2行：关键条件（用/分隔，最多3个）
+#### 判断节点 - 必须包含完整信息：
+第1行：编号 + 判断问题（如：① 是否包含风险词？）
+第2行：具体条件说明（用/分隔多个条件）
+第3行：匹配方式（关键词/正则/语义相似度/模型判断等）
+第4行：示例关键词（帮助理解）
 
-示例：\`{"① 风险检测？<br/>涉政/色情/辱骂"}\`
+示例：
+\`{"① 风险词检测？<br/>涉政/色情/辱骂<br/>暴力/谣言/广告<br/>匹配: 关键词库+模型"}\`
 
-#### 操作/输出节点 - 最多3行：
-第1行：Emoji + 输出类型
-第2行：核心参数（type/intent）
-第3行：动作（【结束】或 → 下一步）
+#### 操作/处理节点 - 必须详细说明：
+第1行：Emoji + 处理动作名称
+第2行：输出字段 type/intent/action 等
+第3行：具体处理内容
+第4行：后续动作（【结束】或 → 跳转到哪个节点）
 
-示例：\`["🚫 风险拦截<br/>type: risk<br/>【结束】"]\`
+示例：
+\`["🚫 风险拦截处理<br/>type: risk_block<br/>content: 拒绝回复+记录日志<br/>action: 结束会话"]\`
 
-### 4. 分支连线简化
-- 是：\`-->|"✅"| B\`
-- 否：\`-->|"❌"| C\`
-- 条件：\`-->|"条件"| D\`
+#### 输出结果节点 - 必须包含完整字段：
+必须包含以下字段：
+- type: 输出类型（明确/模糊/风险等）
+- intent: 意图ID或意图名称
+- content: 输出内容或模板名称
+- confidence: 置信度范围
+- action: 后续动作
 
-### 5. 流程设计原则
+示例：
+\`["✅ 明确匹配输出<br/>type: clear_match<br/>intent: account_login_issue<br/>confidence: >0.85<br/>content: 账号登录指引模板<br/>action: 结束本轮对话"]\`
 
-#### 横向合并相似分支
-将多个判断的"否"分支合并到下一个判断节点，减少纵向层数。
+### 4. 流程设计原则
 
-#### 使用并行节点
-对于多个独立判断，可以并排展示：
+#### 展示完整的决策链
+- 每个判断节点必须有明确的"✅ 是"和"❌ 否"两个分支
+- 对于复杂判断，可以有多个分支（如：唯一匹配/多个候选/无匹配）
+- 使用节点引用表示流程跳转
 
-\`\`\`
-START --> D1{"判断1"} 
-START --> D2{"判断2"}
-\`\`\`
+#### 详细展示处理流程块
+对于复杂的处理流程，使用流程块节点展示内部步骤：
+\`["⑦ 标准匹配流程<br/>─────────────<br/>Step1: 提取核心意图词<br/>Step2: 业务范围校验<br/>Step3: 意图库逐一匹配<br/>Step4: 计算置信度分数<br/>Step5: 输出匹配结果"]\`
 
-#### 限制层级深度
-尽量控制在 5-7 层以内，确保单屏可展示。
+#### 优先级编号
+用数字编号标识优先级：①②③④⑤⑥⑦⑧⑨⑩
 
-### 6. 节点类型对应输出字段
+### 5. 分支连线标签
+- 是分支：\`-->|"✅ 是"| B\`
+- 否分支：\`-->|"❌ 否"| C\`
+- 条件分支：\`-->|"✅ 唯一匹配"| D\`
+- 特殊情况：\`-->|"❌ 含新信息"| E\`
 
-| 节点类型 | 核心字段 |
-|---------|---------|
-| 风险拦截 | type: risk |
-| 情绪安抚 | type: emotion |
-| 意图识别 | type: clear/fuzzy + intent |
-| 业务处理 | type: answer + action |
-| 转人工 | type: transfer |
-| 模糊反问 | type: fuzzy |
+### 6. 输出字段规范表
+
+| 节点类型 | 必须字段 | 说明 |
+|---------|---------|------|
+| 风险拦截 | type, content, action | type=risk, content=风险类别, action=拦截动作 |
+| 情绪安抚 | type, emotion_type, action | type=emotion, emotion_type=愤怒/焦虑等 |
+| 意图识别 | type, intent, confidence, content | type=clear/fuzzy, confidence=置信度 |
+| 业务处理 | type, intent, content, action | type=answer, content=回复模板 |
+| 转人工 | type, reason, queue | type=transfer, queue=技能组 |
+| 模糊反问 | type, candidates, content | type=fuzzy, candidates=候选意图列表 |
 
 ### 7. 禁止事项
 - 不要使用 subgraph
 - 不要使用中文括号（）【】
 - 不要输出 mermaid 代码块之外的任何内容
 - 节点 ID 只用英文/数字/下划线
-- 节点内容不要超过3行
 
 ## 完整示例
 
 \`\`\`mermaid
-graph TB
+graph LR
+    %% 样式定义
     classDef startEnd fill:#e8f4f8,stroke:#2196F3,stroke-width:2px,color:#1565C0
-    classDef decision fill:#fafafa,stroke:#757575,stroke-width:1px,color:#424242
-    classDef process fill:#e3f2fd,stroke:#2196f3,stroke-width:2px,color:#1565c0
-    classDef success fill:#c8e6c9,stroke:#388e3c,stroke-width:2px,color:#1b5e20
-    classDef error fill:#ffcdd2,stroke:#d32f2f,stroke-width:2px,color:#b71c1c
+    classDef decision fill:#fff8e1,stroke:#FFC107,stroke-width:2px,color:#F57F17
+    classDef process fill:#e3f2fd,stroke:#2196F3,stroke-width:2px,color:#1565C0
+    classDef success fill:#c8e6c9,stroke:#4CAF50,stroke-width:2px,color:#2E7D32
+    classDef error fill:#ffcdd2,stroke:#F44336,stroke-width:2px,color:#C62828
+    classDef special fill:#f3e5f5,stroke:#9C27B0,stroke-width:2px,color:#6A1B9A
 
-    START(["🎧 用户输入"]):::startEnd
-    START --> D1{"① 风险检测？<br/>涉政/色情/辱骂"}:::decision
-    D1 -->|"✅"| R1["🚫 风险拦截<br/>type: risk<br/>【结束】"]:::error
-    D1 -->|"❌"| D2{"② 情绪激动？<br/>辱骂/催促/威胁"}:::decision
-    D2 -->|"✅"| EMO{"含业务意图？"}:::decision
-    EMO -->|"✅"| EMO1["😊 安抚+提取<br/>→ 意图匹配"]:::process
-    EMO -->|"❌"| EMO2["😊 安抚引导<br/>type: emotion<br/>【结束】"]:::process
-    D2 -->|"❌"| D3{"③ 身份询问？<br/>是机器人/真人"}:::decision
-    D3 -->|"✅"| ID1["🤖 身份说明<br/>type: identity<br/>【结束】"]:::process
-    D3 -->|"❌"| D4{"④ 转人工？"}:::decision
-    D4 -->|"✅+意图"| T1["📋 提取意图<br/>→ 意图匹配"]:::process
-    D4 -->|"✅ 纯转人工"| T2["💬 安抚反问<br/>type: transfer<br/>【结束】"]:::process
-    D4 -->|"❌"| MATCH["⑤ 意图匹配<br/>关键词/语义"]:::process
-    MATCH --> R{"匹配结果"}:::decision
-    R -->|"唯一匹配"| OUT1["✅ 明确输出<br/>type: clear<br/>【结束】"]:::success
-    R -->|"多个候选"| OUT2["❓ 模糊反问<br/>type: fuzzy<br/>【等待】"]:::process
-    R -->|"无匹配"| OUT3["💭 引导回复<br/>type: unknown<br/>【结束】"]:::process
+    START(["🎧 用户输入消息<br/>─────────<br/>触发AI分析流程"]):::startEnd
+
+    %% ① 风险词检测
+    START --> D1{"① 风险词检测？<br/>涉政/色情/辱骂<br/>暴力/谣言/广告<br/>匹配: 关键词库+模型"}:::decision
+    D1 -->|"✅ 是"| R1["🚫 风险拦截处理<br/>type: risk_block<br/>content: 风险类别+原因<br/>action: 拒绝回复+记录<br/>【拦截结束】"]:::error
+
+    %% ② 情绪判断
+    D1 -->|"❌ 否"| D2{"② 情绪激动判断？<br/>辱骂/催促/威胁<br/>焦虑/不满表达<br/>匹配: 情绪模型+关键词"}:::decision
+    D2 -->|"✅ 是"| EMO_CHECK{"是否含业务意图？<br/>提取有效信息<br/>语义分析判断"}:::decision
+    EMO_CHECK -->|"✅ 有业务意图"| EMO_YES["😊 先安抚情绪<br/>type: emotion_handle<br/>emotion_type: 愤怒/焦虑<br/>action: 安抚话术+提取意图<br/>→ 跳转到 ⑤ 意图匹配"]:::special
+    EMO_CHECK -->|"❌ 纯发泄"| EMO_NO["😊 情绪安抚回复<br/>type: emotion_comfort<br/>content: 安抚模板话术<br/>action: 引导说出问题<br/>【结束】"]:::process
+
+    %% ③ 身份询问
+    D2 -->|"❌ 否"| D3{"③ 身份询问判断？<br/>你是机器人吗<br/>你是真人吗<br/>匹配: 意图模型"}:::decision
+    D3 -->|"✅ 是"| ID1["🤖 身份说明回复<br/>type: identity_reply<br/>content: 我是腾讯客服小助手<br/>action: 标准模板回复<br/>【结束】"]:::process
+
+    %% ④ 转人工判断
+    D3 -->|"❌ 否"| D4{"④ 转人工请求？<br/>转人工/人工客服<br/>我要找人/转接<br/>匹配: 意图识别"}:::decision
+    D4 -->|"✅ 携带业务意图"| T1["📋 提取业务意图<br/>type: intent_extract<br/>action: 忽略转人工<br/>→ 跳转到 ⑤ 意图匹配"]:::special
+    D4 -->|"✅ 纯转人工"| T2["💬 安抚+反问引导<br/>type: transfer_guide<br/>content: 6条模板轮换<br/>action: 引导描述问题<br/>【结束】"]:::process
+
+    %% ⑤ 意图匹配流程
+    D4 -->|"❌ 否"| MATCH["⑤ 意图匹配流程<br/>─────────────<br/>Step1: 提取核心意图词<br/>Step2: 业务范围校验<br/>Step3: 意图库逐一匹配<br/>Step4: 计算置信度分数<br/>Step5: 输出匹配结果"]:::special
+
+    MATCH --> MATCH_R{"匹配结果判断<br/>根据置信度分数<br/>决定输出类型"}:::decision
+    MATCH_R -->|"✅ 唯一匹配<br/>confidence>0.8"| OUT_YES["✅ 明确意图输出<br/>type: clear_match<br/>intent: 具体意图ID<br/>confidence: >0.8<br/>content: 标准回复模板<br/>【结束】"]:::success
+    MATCH_R -->|"❓ 多个候选<br/>0.5<confidence<0.8"| OUT_FUZZY["❓ 模糊反问输出<br/>type: fuzzy_match<br/>candidates: 候选意图列表<br/>content: 反问澄清话术<br/>action: 等待用户澄清<br/>【等待】"]:::warning
+    MATCH_R -->|"❌ 无匹配<br/>confidence<0.5"| OUT_NONE["💭 闲聊引导输出<br/>type: no_match<br/>content: 引导回业务话术<br/>action: 引导描述QQ问题<br/>【结束】"]:::process
 \`\`\`
 
-请根据用户输入的 Prompt 内容，生成紧凑、专业的流程图，确保能在单屏完整展示。`;
+请根据用户输入的 Prompt 内容，生成详细、完整的流程图，让用户清晰理解 AI 的每一步思考过程。`;
+
+// 代码梳理场景 - 从产品经理视角梳理代码逻辑
+const SYSTEM_PROMPT_CODE = `你是一个专业流程图生成器，专门帮助产品经理理解代码逻辑。根据用户输入的代码，生成简洁、易懂的 Mermaid 流程图代码。
+
+## 输出要求
+
+只输出 Mermaid 代码块，不要任何其他文字、标题或说明。
+
+## 核心原则：产品经理视角，隐藏技术细节
+
+### 1. 图表方向
+使用 \`graph LR\`（从左到右布局），便于阅读理解。
+
+### 2. 样式定义（classDef）
+必须在代码开头定义节点样式：
+
+\`\`\`
+classDef startEnd fill:#e8f4f8,stroke:#2196F3,stroke-width:2px,color:#1565C0
+classDef decision fill:#fff8e1,stroke:#FFC107,stroke-width:2px,color:#F57F17
+classDef process fill:#e3f2fd,stroke:#2196F3,stroke-width:2px,color:#1565C0
+classDef success fill:#c8e6c9,stroke:#4CAF50,stroke-width:2px,color:#2E7D32
+classDef warning fill:#fff3e0,stroke:#FF9800,stroke-width:2px,color:#E65100
+\`\`\`
+
+### 3. 节点内容规范【产品经理视角】
+
+#### 判断节点 - 用业务语言描述：
+- 不说"if (user.status === 1)"，说"用户状态是否正常？"
+- 不说"checkPermission(userId)"，说"用户是否有权限？"
+- 不说"validateToken()"，说"登录是否有效？"
+
+示例：
+- 好：\`{"用户是否已登录？"}\`
+- 差：\`{"if (token != null)"}\`
+
+#### 操作节点 - 描述业务行为：
+- 不说"调用API"或"查询数据库"，说"获取用户信息"
+- 不说"return response"，说"返回处理结果"
+- 关注"做什么"，不是"怎么实现"
+
+示例：
+- 好：\`["发送验证码短信<br/>通知用户"]\`
+- 差：\`["调用SMS服务<br/>API: sendSMS()"]\`
+
+### 4. 转换规则
+
+| 技术术语 | 产品经理术语 |
+|---------|------------|
+| if/else | 是否满足条件？ |
+| try/catch | 处理异常情况 |
+| API调用 | 获取/提交数据 |
+| 数据库查询 | 读取/保存信息 |
+| 循环 | 逐个处理 |
+| return | 返回结果 |
+| null/undefined | 为空/不存在 |
+
+### 5. 分支连线
+- 是：\`-->|"✅ 是"| B\`
+- 否：\`-->|"❌ 否"| C\`
+
+### 6. 禁止事项
+- 不要出现代码语法（if/else/return/function等）
+- 不要出现技术术语（API/数据库/缓存等）
+- 不要出现变量名或函数名
+- 不要使用 subgraph
+- 不要使用中文括号（）【】
+
+## 完整示例
+
+输入代码：
+\`\`\`javascript
+async function processOrder(orderId) {
+  const order = await getOrder(orderId);
+  if (!order) return { error: '订单不存在' };
+  if (order.status !== 'pending') return { error: '订单状态异常' };
+  const payment = await processPayment(order);
+  if (!payment.success) {
+    await notifyUser(order.userId, '支付失败');
+    return { error: '支付失败' };
+  }
+  order.status = 'paid';
+  await saveOrder(order);
+  await notifyUser(order.userId, '支付成功');
+  return { success: true };
+}
+\`\`\`
+
+输出流程图：
+\`\`\`mermaid
+graph LR
+    classDef startEnd fill:#e8f4f8,stroke:#2196F3,stroke-width:2px,color:#1565C0
+    classDef decision fill:#fff8e1,stroke:#FFC107,stroke-width:2px,color:#F57F17
+    classDef process fill:#e3f2fd,stroke:#2196F3,stroke-width:2px,color:#1565C0
+    classDef success fill:#c8e6c9,stroke:#4CAF50,stroke-width:2px,color:#2E7D32
+    classDef warning fill:#fff3e0,stroke:#FF9800,stroke-width:2px,color:#E65100
+
+    START(["🛒 开始处理订单"]):::startEnd
+    START --> GET["📋 获取订单信息"]:::process
+    GET --> D1{"订单是否存在？"}:::decision
+    D1 -->|"❌ 否"| E1["❌ 提示: 订单不存在<br/>【结束】"]:::warning
+    D1 -->|"✅ 是"| D2{"订单是否待处理？"}:::decision
+    D2 -->|"❌ 否"| E2["❌ 提示: 订单状态异常<br/>【结束】"]:::warning
+    D2 -->|"✅ 是"| PAY["💳 处理支付"]:::process
+    PAY --> D3{"支付是否成功？"}:::decision
+    D3 -->|"❌ 否"| N1["📱 通知用户: 支付失败<br/>【结束】"]:::warning
+    D3 -->|"✅ 是"| UPDATE["✏️ 更新订单状态"]:::process
+    UPDATE --> N2["📱 通知用户: 支付成功"]:::process
+    N2 --> END(["✅ 处理完成"]):::success
+\`\`\`
+
+请根据用户输入的代码，生成简洁、易懂的流程图，帮助产品经理理解业务逻辑。`;
 
 function getSystemPrompt(scenario: string, isFollowUp: boolean = false): string {
   if (isFollowUp) return SYSTEM_PROMPT_FOLLOW_UP;
@@ -462,6 +601,7 @@ function getSystemPrompt(scenario: string, isFollowUp: boolean = false): string 
     case 'concept': return SYSTEM_PROMPT_CONCEPT;
     case 'report': return SYSTEM_PROMPT_REPORT;
     case 'prompt': return SYSTEM_PROMPT_PROMPT;
+    case 'code': return SYSTEM_PROMPT_CODE;
     default: return SYSTEM_PROMPT_WORK;
   }
 }

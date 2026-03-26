@@ -43,6 +43,7 @@ const SCENARIOS = [
   { id: 'concept', label: '概念梳理' },
   { id: 'report', label: '汇报框架' },
   { id: 'prompt', label: 'Prompt梳理' },
+  { id: 'code', label: '代码梳理' },
 ];
 
 const MAX_IMAGES = 20;
@@ -869,11 +870,11 @@ function HomeContent() {
     return null;
   };
 
-  // 检查是否是 Prompt 梳理场景
-  const isPromptScenario = selectedScenarios.includes('prompt');
+  // 检查是否是流程图场景（Prompt梳理 或 代码梳理）
+  const isFlowchartScenario = selectedScenarios.includes('prompt') || selectedScenarios.includes('code');
 
-  // Prompt 流程图渲染组件 - 直接渲染 Mermaid，支持缩放、拖拽、下载
-  const PromptFlowChart = ({ mermaidCode }: { mermaidCode: string }) => {
+  // 流程图渲染组件 - 直接渲染 Mermaid，支持缩放、拖拽、下载
+  const FlowChart = ({ mermaidCode }: { mermaidCode: string }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [svg, setSvg] = useState<string>('');
     const [scale, setScale] = useState(1);
@@ -891,20 +892,20 @@ function HomeContent() {
           
           mermaid.initialize({
             startOnLoad: false,
-            theme: 'dark',
+            theme: 'default',
             themeVariables: {
-              primaryColor: '#07C160',
-              primaryTextColor: '#FFFFFF',
-              primaryBorderColor: '#2C2C2C',
-              lineColor: '#3C3C3C',
-              secondaryColor: '#1A1A1A',
-              tertiaryColor: '#141414',
-              background: '#141414',
-              mainBkg: '#1A1A1A',
-              nodeBorder: '#3C3C3C',
-              clusterBkg: '#1A1A1A',
-              titleColor: '#FFFFFF',
-              edgeLabelBackground: '#1A1A1A',
+              primaryColor: '#E3F2FD',
+              primaryTextColor: '#1565C0',
+              primaryBorderColor: '#2196F3',
+              lineColor: '#90CAF9',
+              secondaryColor: '#FFF3E0',
+              tertiaryColor: '#E8F5E9',
+              background: '#FFFFFF',
+              mainBkg: '#F5F5F5',
+              nodeBorder: '#BDBDBD',
+              clusterBkg: '#FAFAFA',
+              titleColor: '#212121',
+              edgeLabelBackground: '#FFFFFF',
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
               fontSize: '13px',
             },
@@ -913,8 +914,8 @@ function HomeContent() {
               padding: 15,
               useMaxWidth: true,
               htmlLabels: true,
-              rankSpacing: 50,
-              nodeSpacing: 30,
+              rankSpacing: 60,
+              nodeSpacing: 35,
               defaultRenderer: 'dagre-wrapper',
             },
             sequence: {
@@ -1004,7 +1005,7 @@ function HomeContent() {
       // 下载 SVG
       const downloadLink = document.createElement('a');
       downloadLink.href = svgUrl;
-      downloadLink.download = `prompt-flowchart-${Date.now()}.svg`;
+      downloadLink.download = `flowchart-${Date.now()}.svg`;
       document.body.appendChild(downloadLink);
       downloadLink.click();
       document.body.removeChild(downloadLink);
@@ -1014,43 +1015,39 @@ function HomeContent() {
     return (
       <div className="flex flex-col h-full">
         {/* 工具栏 */}
-        <div className="flex items-center justify-between px-4 py-2 mb-2" style={{ backgroundColor: '#0A0A0A', borderRadius: '8px' }}>
-          <div className="flex items-center gap-1 text-xs" style={{ color: '#666666' }}>
+        <div className="flex items-center justify-between px-4 py-2 mb-2 bg-gray-100 rounded-lg border border-gray-200">
+          <div className="flex items-center gap-1 text-xs text-gray-500">
             <Move className="w-4 h-4 mr-1" />
             按住鼠标拖动
           </div>
           <div className="flex items-center gap-2">
             <button 
               onClick={handleZoomOut}
-              className="p-1.5 rounded hover:bg-[#2C2C2C] transition-colors"
-              style={{ color: '#666666' }}
+              className="p-1.5 rounded hover:bg-gray-200 transition-colors text-gray-600"
               title="缩小"
             >
               <ZoomOut className="w-4 h-4" />
             </button>
-            <span className="text-xs min-w-[50px] text-center" style={{ color: '#A0A0A0' }}>
+            <span className="text-xs min-w-[50px] text-center text-gray-500">
               {Math.round(scale * 100)}%
             </span>
             <button 
               onClick={handleZoomIn}
-              className="p-1.5 rounded hover:bg-[#2C2C2C] transition-colors"
-              style={{ color: '#666666' }}
+              className="p-1.5 rounded hover:bg-gray-200 transition-colors text-gray-600"
               title="放大"
             >
               <ZoomIn className="w-4 h-4" />
             </button>
             <button 
               onClick={handleReset}
-              className="p-1.5 rounded hover:bg-[#2C2C2C] transition-colors ml-2"
-              style={{ color: '#666666' }}
+              className="p-1.5 rounded hover:bg-gray-200 transition-colors ml-2 text-gray-600"
               title="重置"
             >
               <RotateCcw className="w-4 h-4" />
             </button>
             <button 
               onClick={handleDownload}
-              className="flex items-center gap-1 px-2 py-1 rounded hover:bg-[#2C2C2C] transition-colors ml-2"
-              style={{ color: '#07C160' }}
+              className="flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-200 transition-colors ml-2 text-blue-600"
               title="下载"
             >
               <Download className="w-4 h-4" />
@@ -1060,12 +1057,10 @@ function HomeContent() {
         </div>
         
         {/* 画布区域 */}
+        {/* 画布区域 */}
         <div 
-          className="flex-1 overflow-hidden relative"
+          className="flex-1 overflow-hidden relative bg-white rounded-xl border border-gray-200 shadow-sm"
           style={{ 
-            backgroundColor: '#0A0A0A',
-            borderRadius: '12px',
-            border: '1px solid #2C2C2C',
             cursor: isDraggingChart ? 'grabbing' : 'grab',
           }}
           onMouseDown={handleMouseDown}
@@ -1083,8 +1078,8 @@ function HomeContent() {
               dangerouslySetInnerHTML={{ __html: svg }}
             />
           ) : (
-            <div className="flex items-center justify-center h-full">
-              <Loader2 className="w-6 h-6 animate-spin" style={{ color: '#07C160' }} />
+            <div className="flex items-center justify-center h-full text-blue-600">
+              <Loader2 className="w-6 h-6 animate-spin" />
             </div>
           )}
         </div>
@@ -1092,8 +1087,8 @@ function HomeContent() {
     );
   };
 
-  // 渲染 Prompt 梳理场景的内容
-  const renderPromptContent = (): React.ReactNode => {
+  // 渲染流程图场景的内容
+  const renderFlowchartContent = (): React.ReactNode => {
     if (!analysisResult) return null;
     
     const mermaidCode = extractMermaidFromContent(analysisResult);
@@ -1102,7 +1097,7 @@ function HomeContent() {
     if (mermaidCode) {
       return (
         <div key="prompt-flowchart" className="flex-1 flex flex-col h-full">
-          <PromptFlowChart mermaidCode={mermaidCode} />
+          <FlowChart mermaidCode={mermaidCode} />
         </div>
       );
     }
@@ -1112,13 +1107,13 @@ function HomeContent() {
       // 检查是否已经开始输出 mermaid 代码块
       if (analysisResult.includes('```mermaid')) {
         return (
-          <div className="flex items-center gap-2 text-base" style={{ color: '#666666' }}>
+          <div className="flex items-center gap-2 text-base text-gray-500">
             <Loader2 className="w-5 h-5 animate-spin" /><span>正在渲染流程图...</span>
           </div>
         );
       }
       return (
-        <div className="flex items-center gap-2 text-base" style={{ color: '#666666' }}>
+        <div className="flex items-center gap-2 text-base text-gray-500">
           <Loader2 className="w-5 h-5 animate-spin" /><span>生成流程图中...</span>
         </div>
       );
@@ -1130,8 +1125,8 @@ function HomeContent() {
       const code = anyCodeBlock[2].trim();
       if (code.length > 10) {
         return (
-          <div key="prompt-flowchart-fallback" className="flex-1 flex flex-col min-h-[400px]">
-            <PromptFlowChart mermaidCode={code} />
+          <div key="flowchart-fallback" className="flex-1 flex flex-col h-full">
+            <FlowChart mermaidCode={code} />
           </div>
         );
       }
@@ -1139,8 +1134,8 @@ function HomeContent() {
     
     // 最后兜底：显示提示信息
     return (
-      <div className="rounded-xl p-5" style={{ backgroundColor: 'rgba(28, 28, 28, 0.6)', border: '1px solid rgba(44, 44, 44, 0.5)' }}>
-        <div className="text-base" style={{ color: '#999999' }}>
+      <div className="rounded-xl p-5 bg-gray-50 border border-gray-200">
+        <div className="text-base text-gray-500">
           流程图生成完成，但无法解析有效的图表代码。请尝试重新生成。
         </div>
       </div>
@@ -1150,9 +1145,9 @@ function HomeContent() {
   const renderConversation = () => {
     const elements: React.ReactNode[] = [];
     
-    // 如果是 Prompt 梳理场景，使用特殊渲染
-    if (isPromptScenario && analysisResult) {
-      elements.push(renderPromptContent());
+    // 如果是流程图场景，使用特殊渲染
+    if (isFlowchartScenario && analysisResult) {
+      elements.push(renderFlowchartContent());
     } else if (analysisResult) {
       // 普通场景的渲染
       elements.push(
@@ -1327,7 +1322,7 @@ function HomeContent() {
                 
                 <Textarea 
                   ref={textareaRef} 
-                  placeholder={isPromptScenario 
+                  placeholder={isFlowchartScenario 
                     ? "粘贴你的 Prompt 内容...&#10;&#10;我会帮你梳理成可视化的流程图" 
                     : "粘贴开发说的话...&#10;&#10;支持 Ctrl+V 粘贴截图"
                   } 
@@ -1380,7 +1375,7 @@ function HomeContent() {
               </div>
             )}
             
-            <div ref={scrollContainerRef} className={`flex-1 ${isPromptScenario ? 'overflow-hidden p-3' : 'overflow-y-auto p-6'}`}>
+            <div ref={scrollContainerRef} className={`flex-1 ${isFlowchartScenario ? 'overflow-hidden p-3' : 'overflow-y-auto p-6'}`}>
               {isLoadingRecord && (
                 <div className="flex items-center gap-2 text-base" style={{ color: '#666666' }}>
                   <Loader2 className="w-5 h-5 animate-spin" /><span>加载历史记录...</span>
@@ -1389,7 +1384,7 @@ function HomeContent() {
 
               {!isLoadingRecord && (isAnalyzing || isFollowUp) && conversationHistory.length === 0 && (
                 <div className="flex items-center gap-2 text-base" style={{ color: '#666666' }}>
-                  <Loader2 className="w-5 h-5 animate-spin" /><span>{isPromptScenario ? '生成流程图中...' : '分析中...'}</span>
+                  <Loader2 className="w-5 h-5 animate-spin" /><span>{isFlowchartScenario ? '生成流程图中...' : '分析中...'}</span>
                 </div>
               )}
 
@@ -1405,7 +1400,7 @@ function HomeContent() {
 
               {/* 主要内容和对话历史 */}
               {!isLoadingRecord && conversationHistory.length > 0 && (
-                <div className={`text-base leading-relaxed ${isPromptScenario ? 'h-full flex flex-col overflow-hidden' : ''}`}>
+                <div className={`text-base leading-relaxed ${isFlowchartScenario ? 'h-full flex flex-col overflow-hidden' : ''}`}>
                   {renderConversation()}
                 </div>
               )}
