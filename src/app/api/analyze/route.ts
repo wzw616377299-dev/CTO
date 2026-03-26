@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { LLMClient, Config, HeaderUtils, SearchClient } from 'coze-coding-dev-sdk';
+import { LLMClient, Config, HeaderUtils } from 'coze-coding-dev-sdk';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
-import { getModelConfig, CURRENT_MODEL_VERSION } from '@/config/model.config';
+import { getModelByScenario } from '@/config/model.config';
 
 // 企微沟通场景
 const SYSTEM_PROMPT_WORK = `你是首席技术官（CTO），产品经理的战略合作伙伴。
@@ -506,17 +506,6 @@ interface Message {
   content: string;
 }
 
-// 假流式输出：将完整内容分块发送，模拟流式效果
-async function* fakeStreamGenerator(content: string, chunkSize: number = 5): AsyncGenerator<string> {
-  const chars = content.split('');
-  for (let i = 0; i < chars.length; i += chunkSize) {
-    const chunk = chars.slice(i, i + chunkSize).join('');
-    yield chunk;
-    // 添加小延迟，让前端有时间渲染
-    await new Promise(resolve => setTimeout(resolve, 12));
-  }
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -565,26 +554,28 @@ export async function POST(request: NextRequest) {
       ];
     }
     
+    // 根据场景获取模型配置
+    const modelConfig = getModelByScenario(scenario);
+    
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
         let fullContent = '';
         
         try {
-          // 统一使用假流式：先获取完整内容，再逐字发送
-          // 使用集中的模型配置，便于后续更新
-          const modelConfig = getModelConfig('primary');
-          
-          const response = await client.invoke(messages, {
+          // 使用真正的流式输出 - client.stream()
+          const llmStream = client.stream(messages, {
             model: modelConfig.model,
             temperature: modelConfig.temperature,
           });
           
-          fullContent = response.content;
-          
-          // 假流式发送：每次发送 5 个字符，间隔 12ms
-          for await (const chunk of fakeStreamGenerator(fullContent, 5)) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: chunk })}\n\n`));
+          // 逐块处理流式响应
+          for await (const chunk of llmStream) {
+            if (chunk.content) {
+              const text = chunk.content.toString();
+              fullContent += text;
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: text })}\n\n`));
+            }
           }
           
           // 发送完成信号

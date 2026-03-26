@@ -48,10 +48,11 @@ export const MODEL_CONFIG = {
   },
 
   // 代码理解 - 适合代码分析和梳理
+  // Kimi K2.5 是代码领域最强模型
   code: {
     model: 'kimi-k2-5-260127',
-    temperature: 0.3,
-    description: 'Kimi K2.5 - 代码理解专家',
+    temperature: 0.6, // Kimi K2.5 要求固定 0.6（非thinking）或 1.0（thinking）
+    description: 'Kimi K2.5 - 代码理解专家（代码领域最强）',
     lastUpdated: '2025-01-27',
   },
 
