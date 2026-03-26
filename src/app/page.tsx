@@ -14,7 +14,12 @@ import {
   Square,
   X,
   Plus,
-  Trash2
+  Trash2,
+  ZoomIn,
+  ZoomOut,
+  Download,
+  RotateCcw,
+  Move
 } from 'lucide-react';
 import { analyzeApi, uploadApi, ocrApi, getUserId, recordsApi } from '@/lib/api';
 import Link from 'next/link';
@@ -859,63 +864,198 @@ function HomeContent() {
   // 检查是否是 Prompt 梳理场景
   const isPromptScenario = selectedScenarios.includes('prompt');
 
-  // Prompt 流程图渲染组件
+  // Prompt 流程图渲染组件 - 支持缩放、拖拽、下载
   const PromptFlowChart = ({ htmlContent }: { htmlContent: string }) => {
     const containerRef = useRef<HTMLDivElement>(null);
+    const contentRef = useRef<HTMLDivElement>(null);
+    const [scale, setScale] = useState(1);
     const [isDraggingChart, setIsDraggingChart] = useState(false);
-    const [startX, setStartX] = useState(0);
-    const [scrollLeft, setScrollLeft] = useState(0);
+    const [position, setPosition] = useState({ x: 0, y: 0 });
+    const [startPos, setStartPos] = useState({ x: 0, y: 0 });
+    const [iframeHeight, setIframeHeight] = useState(600);
 
+    // 计算实际可用高度
+    useEffect(() => {
+      const updateHeight = () => {
+        if (containerRef.current) {
+          const rect = containerRef.current.getBoundingClientRect();
+          setIframeHeight(Math.max(500, window.innerHeight - 200));
+        }
+      };
+      updateHeight();
+      window.addEventListener('resize', updateHeight);
+      return () => window.removeEventListener('resize', updateHeight);
+    }, []);
+
+    // 缩放控制
+    const handleZoomIn = () => setScale(prev => Math.min(prev + 0.2, 3));
+    const handleZoomOut = () => setScale(prev => Math.max(prev - 0.2, 0.3));
+    const handleReset = () => {
+      setScale(1);
+      setPosition({ x: 0, y: 0 });
+    };
+
+    // 拖拽控制
     const handleMouseDown = (e: React.MouseEvent) => {
-      if (!containerRef.current) return;
+      if (e.button !== 0) return; // 只响应左键
       setIsDraggingChart(true);
-      setStartX(e.pageX - containerRef.current.offsetLeft);
-      setScrollLeft(containerRef.current.scrollLeft);
+      setStartPos({ x: e.clientX - position.x, y: e.clientY - position.y });
     };
 
-    const handleMouseUp = () => {
-      setIsDraggingChart(false);
-    };
+    const handleMouseUp = () => setIsDraggingChart(false);
 
     const handleMouseMove = (e: React.MouseEvent) => {
-      if (!isDraggingChart || !containerRef.current) return;
+      if (!isDraggingChart) return;
       e.preventDefault();
-      const x = e.pageX - containerRef.current.offsetLeft;
-      const walk = (x - startX) * 1.5; // 滚动速度
-      containerRef.current.scrollLeft = scrollLeft - walk;
+      setPosition({
+        x: e.clientX - startPos.x,
+        y: e.clientY - startPos.y
+      });
     };
 
-    const handleMouseLeave = () => {
-      setIsDraggingChart(false);
+    const handleMouseLeave = () => setIsDraggingChart(false);
+
+    // 下载图片
+    const handleDownload = async () => {
+      try {
+        // 创建一个 canvas 来截图
+        const iframe = document.querySelector('#prompt-iframe') as HTMLIFrameElement;
+        if (!iframe || !iframe.contentDocument) return;
+        
+        // 使用 html2canvas 或简单的截图方式
+        // 由于安全限制，我们使用另一种方式：直接下载 SVG
+        const svgElement = iframe.contentDocument.querySelector('svg');
+        if (svgElement) {
+          const svgData = new XMLSerializer().serializeToString(svgElement);
+          const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+          const svgUrl = URL.createObjectURL(svgBlob);
+          
+          const downloadLink = document.createElement('a');
+          downloadLink.href = svgUrl;
+          downloadLink.download = `prompt-flowchart-${Date.now()}.svg`;
+          document.body.appendChild(downloadLink);
+          downloadLink.click();
+          document.body.removeChild(downloadLink);
+          URL.revokeObjectURL(svgUrl);
+        }
+      } catch (error) {
+        console.error('下载失败:', error);
+        // 备用方案：下载整个 HTML
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `prompt-flowchart-${Date.now()}.html`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
     };
+
+    // 将 HTML 中的亮色主题替换为暗黑主题
+    const darkHtmlContent = htmlContent
+      .replace(/#f5f7fa/gi, '#0A0A0A')           // 页面背景
+      .replace(/#ffffff/gi, '#1A1A1A')           // 白色背景
+      .replace(/#fff/gi, '#1A1A1A')              // 白色
+      .replace(/#1a1a2e/gi, '#FFFFFF')           // 深色标题文字
+      .replace(/#666/gi, '#A0A0A0')              // 副标题文字
+      .replace(/box-shadow:[^;]+;/gi, 'box-shadow: 0 2px 12px rgba(0,0,0,0.4);') // 阴影
+      .replace(/background:\s*white/gi, 'background: #1A1A1A')
+      .replace(/background:\s*#fff/gi, 'background: #1A1A1A')
+      // Mermaid 主题
+      .replace(/theme:\s*'default'/gi, "theme: 'dark'")
+      .replace(/"primaryColor":\s*"#[^"]*"/gi, '"primaryColor": "#07C160"')
+      .replace(/"primaryTextColor":\s*"#[^"]*"/gi, '"primaryTextColor": "#FFFFFF"')
+      .replace(/"primaryBorderColor":\s*"#[^"]*"/gi, '"primaryBorderColor": "#2C2C2C"')
+      .replace(/"lineColor":\s*"#[^"]*"/gi, '"lineColor": "#3C3C3C"')
+      .replace(/"background":\s*"#[^"]*"/gi, '"background": "#141414"');
 
     return (
-      <div 
-        ref={containerRef}
-        className="w-full overflow-x-auto cursor-grab active:cursor-grabbing"
-        style={{ 
-          backgroundColor: '#0A0A0A',
-          borderRadius: '12px',
-          border: '1px solid #2C2C2C',
-          minHeight: '400px',
-          maxHeight: '70vh',
-        }}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-      >
-        <iframe
-          srcDoc={htmlContent}
-          className="w-full h-full min-h-[400px]"
+      <div className="flex flex-col h-full">
+        {/* 工具栏 */}
+        <div className="flex items-center justify-between px-4 py-2 mb-2" style={{ backgroundColor: '#0A0A0A', borderRadius: '8px' }}>
+          <div className="flex items-center gap-1 text-xs" style={{ color: '#666666' }}>
+            <Move className="w-4 h-4 mr-1" />
+            按住鼠标拖动
+          </div>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={handleZoomOut}
+              className="p-1.5 rounded hover:bg-[#2C2C2C] transition-colors"
+              style={{ color: '#666666' }}
+              title="缩小"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </button>
+            <span className="text-xs min-w-[50px] text-center" style={{ color: '#A0A0A0' }}>
+              {Math.round(scale * 100)}%
+            </span>
+            <button 
+              onClick={handleZoomIn}
+              className="p-1.5 rounded hover:bg-[#2C2C2C] transition-colors"
+              style={{ color: '#666666' }}
+              title="放大"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={handleReset}
+              className="p-1.5 rounded hover:bg-[#2C2C2C] transition-colors ml-2"
+              style={{ color: '#666666' }}
+              title="重置"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={handleDownload}
+              className="flex items-center gap-1 px-2 py-1 rounded hover:bg-[#2C2C2C] transition-colors ml-2"
+              style={{ color: '#07C160' }}
+              title="下载"
+            >
+              <Download className="w-4 h-4" />
+              <span className="text-xs">下载</span>
+            </button>
+          </div>
+        </div>
+        
+        {/* 画布区域 */}
+        <div 
+          ref={containerRef}
+          className="flex-1 overflow-hidden cursor-grab active:cursor-grabbing relative"
           style={{ 
-            border: 'none',
-            minWidth: '800px',
-            backgroundColor: '#f5f7fa',
+            backgroundColor: '#0A0A0A',
+            borderRadius: '12px',
+            border: '1px solid #2C2C2C',
+            minHeight: `${iframeHeight}px`,
           }}
-          sandbox="allow-scripts"
-          title="Prompt 流程图"
-        />
+          onMouseDown={handleMouseDown}
+          onMouseUp={handleMouseUp}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+        >
+          <div 
+            ref={contentRef}
+            className="absolute"
+            style={{
+              transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+              transformOrigin: 'center center',
+              transition: isDraggingChart ? 'none' : 'transform 0.1s ease-out',
+            }}
+          >
+            <iframe
+              id="prompt-iframe"
+              srcDoc={darkHtmlContent}
+              className="border-none"
+              style={{ 
+                width: '1000px',
+                height: `${iframeHeight}px`,
+                backgroundColor: '#0A0A0A',
+                pointerEvents: 'none', // 禁用 iframe 内的鼠标事件，让父容器处理拖拽
+              }}
+              sandbox="allow-scripts"
+              title="Prompt 流程图"
+            />
+          </div>
+        </div>
       </div>
     );
   };
@@ -928,7 +1068,7 @@ function HomeContent() {
     
     if (htmlContent) {
       return (
-        <div key="prompt-flowchart" className="mb-6">
+        <div key="prompt-flowchart" className="h-full flex flex-col flex-1">
           <PromptFlowChart htmlContent={htmlContent} />
         </div>
       );
@@ -1188,7 +1328,7 @@ function HomeContent() {
               </div>
             )}
             
-            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6">
+            <div ref={scrollContainerRef} className={`flex-1 ${isPromptScenario ? 'overflow-hidden p-2' : 'overflow-y-auto p-6'}`}>
               {isLoadingRecord && (
                 <div className="flex items-center gap-2 text-base" style={{ color: '#666666' }}>
                   <Loader2 className="w-5 h-5 animate-spin" /><span>加载历史记录...</span>
@@ -1197,7 +1337,7 @@ function HomeContent() {
 
               {!isLoadingRecord && (isAnalyzing || isFollowUp) && conversationHistory.length === 0 && (
                 <div className="flex items-center gap-2 text-base" style={{ color: '#666666' }}>
-                  <Loader2 className="w-5 h-5 animate-spin" /><span>分析中...</span>
+                  <Loader2 className="w-5 h-5 animate-spin" /><span>{isPromptScenario ? '生成流程图中...' : '分析中...'}</span>
                 </div>
               )}
 
@@ -1213,7 +1353,7 @@ function HomeContent() {
 
               {/* 主要内容和对话历史 */}
               {!isLoadingRecord && conversationHistory.length > 0 && (
-                <div className="text-base leading-relaxed">
+                <div className={`text-base leading-relaxed ${isPromptScenario ? 'h-full flex flex-col' : ''}`}>
                   {renderConversation()}
                 </div>
               )}
