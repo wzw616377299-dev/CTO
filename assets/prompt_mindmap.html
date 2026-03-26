@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QQ客服意图识别Agent - 思维导图</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    background: linear-gradient(135deg, #0c1220 0%, #1a2332 50%, #0f1923 100%);
+    min-height: 100vh;
+    color: #e0e6ed;
+    overflow-x: hidden;
+  }
+
+  .header {
+    text-align: center;
+    padding: 40px 20px 20px;
+  }
+  .header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #60a5fa, #a78bfa, #f472b6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+  }
+  .header p {
+    color: #8899aa;
+    font-size: 14px;
+  }
+
+  .mindmap-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+    position: relative;
+  }
+
+  /* ===== 中心节点 ===== */
+  .center-node {
+    width: 260px;
+    margin: 0 auto 50px;
+    padding: 24px;
+    background: linear-gradient(135deg, #1e3a5f, #2d1b69);
+    border: 2px solid rgba(96, 165, 250, 0.4);
+    border-radius: 20px;
+    text-align: center;
+    box-shadow: 0 0 40px rgba(96, 165, 250, 0.15), 0 8px 32px rgba(0,0,0,0.3);
+    position: relative;
+    z-index: 2;
+  }
+  .center-node .icon { font-size: 36px; margin-bottom: 8px; }
+  .center-node .title { font-size: 18px; font-weight: 700; color: #fff; }
+  .center-node .subtitle { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+
+  /* ===== 分支区域 ===== */
+  .branches {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    max-width: 1300px;
+    margin: 0 auto;
+  }
+
+  .branch {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px;
+    padding: 24px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .branch::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    border-radius: 16px 16px 0 0;
+  }
+  .branch:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+    border-color: rgba(255,255,255,0.1);
+  }
+
+  /* 不同分支的颜色 */
+  .branch.blue::before { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+  .branch.purple::before { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+  .branch.green::before { background: linear-gradient(90deg, #10b981, #34d399); }
+  .branch.orange::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+  .branch.pink::before { background: linear-gradient(90deg, #ec4899, #f472b6); }
+  .branch.cyan::before { background: linear-gradient(90deg, #06b6d4, #22d3ee); }
+  .branch.red::before { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+  .branch-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .branch-icon {
+    width: 42px; height: 42px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .branch.blue .branch-icon { background: rgba(59,130,246,0.15); }
+  .branch.purple .branch-icon { background: rgba(139,92,246,0.15); }
+  .branch.green .branch-icon { background: rgba(16,185,129,0.15); }
+  .branch.orange .branch-icon { background: rgba(245,158,11,0.15); }
+  .branch.pink .branch-icon { background: rgba(236,72,153,0.15); }
+  .branch.cyan .branch-icon { background: rgba(6,182,212,0.15); }
+  .branch.red .branch-icon { background: rgba(239,68,68,0.15); }
+
+  .branch-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+  }
+  .branch.blue .branch-title { color: #93bbfc; }
+  .branch.purple .branch-title { color: #c4b5fd; }
+  .branch.green .branch-title { color: #6ee7b7; }
+  .branch.orange .branch-title { color: #fcd34d; }
+  .branch.pink .branch-title { color: #f9a8d4; }
+  .branch.cyan .branch-title { color: #67e8f9; }
+  .branch.red .branch-title { color: #fca5a5; }
+
+  .toggle-arrow {
+    margin-left: auto;
+    font-size: 12px;
+    color: #64748b;
+    transition: transform 0.3s;
+  }
+  .branch.collapsed .toggle-arrow { transform: rotate(-90deg); }
+  .branch.collapsed .branch-content { display: none; }
+
+  /* ===== 内容 ===== */
+  .branch-content { padding-left: 4px; }
+
+  .item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: #b0bec5;
+  }
+  .item:last-child { border-bottom: none; }
+  .item .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    margin-top: 7px;
+    flex-shrink: 0;
+  }
+  .branch.blue .dot { background: #3b82f6; }
+  .branch.purple .dot { background: #8b5cf6; }
+  .branch.green .dot { background: #10b981; }
+  .branch.orange .dot { background: #f59e0b; }
+  .branch.pink .dot { background: #ec4899; }
+  .branch.cyan .dot { background: #06b6d4; }
+  .branch.red .dot { background: #ef4444; }
+
+  .item strong { color: #e2e8f0; font-weight: 600; }
+  .item code {
+    background: rgba(255,255,255,0.06);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: 'SF Mono', Monaco, Menlo, monospace;
+    font-size: 12px;
+    color: #93c5fd;
+  }
+
+  /* 子列表 */
+  .sub-items {
+    padding-left: 16px;
+    margin-top: 6px;
+  }
+  .sub-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 12.5px;
+    color: #8899aa;
+    line-height: 1.5;
+  }
+  .sub-item .dash { color: #4a5568; flex-shrink: 0; }
+
+  /* 流程步骤 */
+  .flow-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .flow-step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+    font-size: 13px;
+    color: #b0bec5;
+  }
+  .step-num {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+    color: #fff;
+  }
+  .branch.green .step-num { background: rgba(16,185,129,0.3); }
+  .flow-arrow {
+    text-align: center;
+    color: #4a5568;
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  /* 优先级列表 */
+  .priority-list {
+    counter-reset: priority;
+  }
+  .priority-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    font-size: 13px;
+    color: #b0bec5;
+  }
+  .priority-item:last-child { border-bottom: none; }
+  .priority-num {
+    width: 22px; height: 22px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  /* JSON 输出样式 */
+  .json-box {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-family: 'SF Mono', Monaco, Menlo, monospace;
+    font-size: 12px;
+    margin: 6px 0;
+    color: #93c5fd;
+  }
+
+  /* 底部全宽分支 */
+  .full-width {
+    grid-column: 1 / -1;
+  }
+
+  /* 标签 */
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-right: 4px;
+  }
+  .tag.highest { background: rgba(239,68,68,0.2); color: #fca5a5; }
+  .tag.high { background: rgba(245,158,11,0.2); color: #fcd34d; }
+  .tag.mid { background: rgba(59,130,246,0.2); color: #93bbfc; }
+  .tag.low { background: rgba(16,185,129,0.2); color: #6ee7b7; }
+
+  /* 响应式 */
+  @media (max-width: 768px) {
+    .branches { grid-template-columns: 1fr; }
+    .full-width { grid-column: 1; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>QQ客服意图识别与反问引导 Agent</h1>
+  <p>腾讯QQ客服服务专家 · 语义分析 · 意图匹配 · 反问引导 · 点击分支标题可折叠/展开</p>
+</div>
+
+<div class="mindmap-container">
+
+  <!-- 中心节点 -->
+  <div class="center-node">
+    <div class="icon">🤖</div>
+    <div class="title">QQ客服意图识别Agent</div>
+    <div class="subtitle">精确语义匹配 → JSON 格式输出</div>
+    <div style="margin-top:12px; display:flex; gap:6px; justify-content:center; flex-wrap:wrap;">
+      <span class="tag mid">登录安全</span>
+      <span class="tag mid">核心功能</span>
+      <span class="tag mid">增值消费</span>
+    </div>
+  </div>
+
+  <div class="branches">
+
+    <!-- ===== 1. 前置拦截 ===== -->
+    <div class="branch red">
+      <div class="branch-header" onclick="toggleBranch(this)">
+        <div class="branch-icon">🛡️</div>
+        <div class="branch-title">前置拦截（最高优先级）</div>
+        <div class="toggle-arrow">▼</div>
+      </div>
+      <div class="branch-content">
+        <div class="item">
+          <div class="dot"></div>
+          <div>
+            <strong>风险词识别</strong>
+            <div class="sub-items">
+              <div class="sub-item"><span class="dash">—</span> 涉政、色情低俗、辱骂攻击、暴力恐怖、虚假谣言、侵权隐私、宗教民族、价值观偏差</div>
+              <div class="sub-item"><span class="dash">→</span> <code>{"type":"风险","content":"风险类别"}</code></div>
+            </div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="dot"></div>
+          <div>
+            <strong>情绪激动</strong> → 安抚处理
+          </div>
+        </div>
+        <div class="item">
+          <div class="dot"></div>
+          <div>
+            <strong>询问身份</strong> → 固定模板
+            <div class="json-box">{"type":"模糊","content":"我是腾讯客服智能小助手..."}</div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="dot"></div>
+          <div>
+            <strong>要求转人工</strong> → 安抚 + 反问引导
+          </div>
+        </div>
+        <div class="item">
+          <div class="dot"></div>
+          <div>
+            <strong>否定回复</strong> → 固定模板
+            <div class="json-box">{"type":"模糊","content":"非常抱歉，那可以麻烦你再详细说下..."}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 2. 标准匹配流程 ===== -->
+    <div class="branch green">
+      <div class="branch-header" onclick="toggleBranch(this)">
+        <div class="branch-icon">🔄</div>
+        <div class="branch-title">标准匹配流程</div>
+        <div class="toggle-arrow">▼</div>
+      </div>
+      <div class="branch-content">
+        <div class="flow-steps">
+          <div class="flow-step">
+            <div class="step-num">1</div>
+            <div><strong>提取核心意图</strong>：忽略语气词、代词、错别字，保留实质性信息</div>
+          </div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step">
+            <div class="step-num">2</div>
+            <div><strong>业务判断</strong>：确认是否属于QQ业务范围，非业务按闲聊引导处理</div>
+          </div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step">
+            <div class="step-num">3</div>
+            <div><strong>意图匹配</strong>：逐个对比候选意图，判断是否完全匹配</div>
+          </div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step">
+            <div class="step-num">4</div>
+            <div><strong>输出结果</strong>：唯一匹配 → 意图ID；无匹配 → 反问话术</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 3. 匹配标准 ===== -->
+    <div class="branch blue">
+      <div class="branch-header" onclick="toggleBranch(this)">
+        <div class="branch-icon">✅</div>
+        <div class="branch-title">匹配标准</div>
+        <div class="toggle-arrow">▼</div>
+      </div>
+      <div class="branch-content">
+        <div class="item">
+          <div class="dot"></div>
+          <div>
+            <strong style="color:#6ee7b7;">✓ 匹配条件（满足任一）</strong>
+            <div class="sub-items">
+              <div class="sub-item"><span class="dash">•</span> 与 <code>intent_desc</code> 核心语义一致，场景相同</div>
+              <div class="sub-item"><span class="dash">•</span> 与 <code>user_message</code> 示例核心诉求一致</div>
+              <div class="sub-item"><span class="dash">•</span> 用户问题是意图示例的<strong>同义表达</strong></div>
+            </div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="dot"></div>
+          <div>
+            <strong style="color:#fca5a5;">✗ 不匹配条件（任一）</strong>
+            <div class="sub-items">
+              <div class="sub-item"><span class="dash">•</span> 核心意图明显不同（如"冻结"≠"解冻"）</div>
+              <div class="sub-item"><span class="dash">•</span> 问题过于笼统/模糊</div>
+              <div class="sub-item"><span class="dash">•</span> 包含未涉及的额外限定条件</div>
+              <div class="sub-item"><span class="dash">•</span> 存在多个候选意图的语义歧义</div>
+            </div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="dot"></div>
+          <div>
+            <strong style="color:#fcd34d;">⚠ 重要原则</strong>：询问方式差异不影响匹配，聚焦<strong>核心问题对象和诉求</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 4. 反问话术生成 ===== -->
+    <div class="branch purple">
+      <div class="branch-header" onclick="toggleBranch(this)">
+        <div class="branch-icon">💬</div>
+        <div class="branch-title">反问话术生成规则</div>
+        <div class="toggle-arrow">▼</div>
+      </div>
+      <div class="branch-content">
+        <div class="item">
+          <div class="dot"></div>
+          <div>
+            <strong>核心要求</strong>
+            <div class="sub-items">
+              <div class="sub-item"><span class="dash">•</span> 话术 ≤ 60字</div>
+              <div class="sub-item"><span class="dash">•</span> 通俗易懂，避免专业术语</div>
+              <div class="sub-item"><span class="dash">•</span> 专业亲和语言风格</div>
+              <div class="sub-item"><span class="dash">•</span> 结构：[关键词置入] + [场景举例]</div>
+            </div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="dot"></div>
+          <div>
+            <strong>关键词库</strong>
+            <div class="sub-items">
+              <div class="sub-item"><span class="dash">🔧</span> 操作动词：登录、绑定、解冻、开通、充值、查询等</div>
+              <div class="sub-item"><span class="dash">📦</span> 业务名词：会员、空间、群、邮箱、支付、验证等</div>
+            </div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="dot"></div>
+          <div>
+            <strong>特殊模板</strong>
+            <div class="sub-items">
+              <div class="sub-item"><span class="dash">💭</span> 闲聊引导（变换使用多条模板）</div>
+              <div class="sub-item"><span class="dash">🤝</span> 转人工安抚（变换使用多条模板）</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 5. 输出格式 ===== -->
+    <div class="branch cyan">
+      <div class="branch-header" onclick="toggleBranch(this)">
+        <div class="branch-icon">📤</div>
+        <div class="branch-title">输出格式规范</div>
+        <div class="toggle-arrow">▼</div>
+      </div>
+      <div class="branch-content">
+        <div class="item">
+          <div class="dot"></div>
+          <div>
+            <strong style="color:#6ee7b7;">匹配成功（明确）</strong>
+            <div class="json-box">{"type": "明确", "content": "意图ID"}</div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="dot"></div>
+          <div>
+            <strong style="color:#fcd34d;">匹配失败（模糊）</strong>
+            <div class="json-box">{"type": "模糊", "content": "引导用户的反问话术"}</div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="dot"></div>
+          <div>
+            <strong style="color:#fca5a5;">风险拦截</strong>
+            <div class="json-box">{"type": "风险", "content": "对应风险类别"}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 6. 质量控制 ===== -->
+    <div class="branch orange">
+      <div class="branch-header" onclick="toggleBranch(this)">
+        <div class="branch-icon">🎯</div>
+        <div class="branch-title">质量控制与优先级</div>
+        <div class="toggle-arrow">▼</div>
+      </div>
+      <div class="branch-content">
+        <div class="item">
+          <div class="dot"></div>
+          <div>
+            <strong>处理优先级</strong>（从高到低）
+            <div class="priority-list" style="margin-top:8px;">
+              <div class="priority-item">
+                <div class="priority-num" style="background:rgba(239,68,68,0.3);color:#fca5a5;">1</div>
+                <span>风险词处理</span>
+                <span class="tag highest">最高</span>
+              </div>
+              <div class="priority-item">
+                <div class="priority-num" style="background:rgba(245,158,11,0.3);color:#fcd34d;">2</div>
+                <span>用户情绪安抚</span>
+                <span class="tag high">高</span>
+              </div>
+              <div class="priority-item">
+                <div class="priority-num" style="background:rgba(245,158,11,0.3);color:#fcd34d;">3</div>
+                <span>用户询问身份</span>
+                <span class="tag high">高</span>
+              </div>
+              <div class="priority-item">
+                <div class="priority-num" style="background:rgba(59,130,246,0.3);color:#93bbfc;">4</div>
+                <span>用户要求转人工</span>
+                <span class="tag mid">中</span>
+              </div>
+              <div class="priority-item">
+                <div class="priority-num" style="background:rgba(59,130,246,0.3);color:#93bbfc;">5</div>
+                <span>否定回复</span>
+                <span class="tag mid">中</span>
+              </div>
+              <div class="priority-item">
+                <div class="priority-num" style="background:rgba(16,185,129,0.3);color:#6ee7b7;">6</div>
+                <span>闲聊引导</span>
+                <span class="tag low">低</span>
+              </div>
+              <div class="priority-item">
+                <div class="priority-num" style="background:rgba(16,185,129,0.3);color:#6ee7b7;">7</div>
+                <span>标准反问引导</span>
+                <span class="tag low">低</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="dot"></div>
+          <div>
+            <strong>避免重复</strong>
+            <div class="sub-items">
+              <div class="sub-item"><span class="dash">•</span> 单次对话不重复语义</div>
+              <div class="sub-item"><span class="dash">•</span> 多轮对话变换话术文案</div>
+              <div class="sub-item"><span class="dash">•</span> 同一反问中关键词不重复</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 7. 严格约束（全宽） ===== -->
+    <div class="branch pink full-width">
+      <div class="branch-header" onclick="toggleBranch(this)">
+        <div class="branch-icon">🔒</div>
+        <div class="branch-title">严格约束（7条红线）</div>
+        <div class="toggle-arrow">▼</div>
+      </div>
+      <div class="branch-content">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 4px 24px;">
+          <div class="item"><div class="dot"></div><div>❶ 禁止使用模型知识推理，只能基于候选意图列表判断</div></div>
+          <div class="item"><div class="dot"></div><div>❷ 输出前必须验证意图ID存在于列表中</div></div>
+          <div class="item"><div class="dot"></div><div>❸ 相似问题必须输出相同结果（一致性）</div></div>
+          <div class="item"><div class="dot"></div><div>❹ 包含未提及限定条件时必须输出"模糊"</div></div>
+          <div class="item"><div class="dot"></div><div>❺ 具体子问题必须输出"模糊"</div></div>
+          <div class="item"><div class="dot"></div><div>❻ 话术控制在60字以内，表达通俗易懂</div></div>
+          <div class="item"><div class="dot"></div><div>❼ 返回必须是 JSON 格式</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 8. 关键示例（全宽） ===== -->
+    <div class="branch cyan full-width">
+      <div class="branch-header" onclick="toggleBranch(this)">
+        <div class="branch-icon">📋</div>
+        <div class="branch-title">关键示例</div>
+        <div class="toggle-arrow">▼</div>
+      </div>
+      <div class="branch-content">
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
+          <div>
+            <div style="font-weight:600; color:#6ee7b7; margin-bottom:8px; font-size:13px;">✅ 完全匹配</div>
+            <div class="sub-item" style="margin-bottom:6px;"><span class="dash">•</span> "账号被冻结了怎么解决" → <code>明确:10001</code></div>
+            <div class="sub-item"><span class="dash">•</span> "QQ登陆不上去" → <code>明确:10002</code></div>
+          </div>
+          <div>
+            <div style="font-weight:600; color:#fcd34d; margin-bottom:8px; font-size:13px;">🔍 不匹配（反问）</div>
+            <div class="sub-item" style="margin-bottom:6px;"><span class="dash">•</span> "密码忘记了" → 反问密码相关场景</div>
+            <div class="sub-item"><span class="dash">•</span> "iOS登录失败" → 反问iOS具体问题</div>
+          </div>
+          <div>
+            <div style="font-weight:600; color:#f9a8d4; margin-bottom:8px; font-size:13px;">⚡ 特殊情况</div>
+            <div class="sub-item" style="margin-bottom:6px;"><span class="dash">•</span> "你是真人吗" → 身份模板</div>
+            <div class="sub-item" style="margin-bottom:6px;"><span class="dash">•</span> "转人工" → 安抚+引导</div>
+            <div class="sub-item"><span class="dash">•</span> "你好呀" → 闲聊引导</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- .branches -->
+</div><!-- .mindmap-container -->
+
+<script>
+function toggleBranch(header) {
+  const branch = header.parentElement;
+  branch.classList.toggle('collapsed');
+}
+</script>
+
+</body>
+</html>

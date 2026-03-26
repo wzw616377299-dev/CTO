@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>QQ客服意图识别 - 判断逻辑流程图</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #f5f7fa;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 {
+      color: #1a1a2e;
+      margin-bottom: 8px;
+      font-size: 22px;
+    }
+    .subtitle {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+    .mermaid {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      max-width: 95vw;
+      overflow-x: auto;
+    }
+    .legend {
+      margin-top: 24px;
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #333;
+    }
+    .legend-color {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>📋 QQ客服意图识别 · 判断逻辑流程图</h1>
+<p class="subtitle">优先级从左到右递减，命中即结束（情绪+业务意图的复合场景除外）</p>
+
+<div class="mermaid">
+graph LR
+    %% 样式定义
+    classDef startEnd fill:#e8f4f8,stroke:#2196F3,stroke-width:2px,color:#1565C0
+    classDef risk fill:#ffebee,stroke:#f44336,stroke-width:2px,color:#c62828
+    classDef emotion fill:#fff3e0,stroke:#ff9800,stroke-width:2px,color:#e65100
+    classDef identity fill:#fff8e1,stroke:#ffc107,stroke-width:2px,color:#f57f17
+    classDef transfer fill:#e8f5e9,stroke:#4caf50,stroke-width:2px,color:#2e7d32
+    classDef deny fill:#e0f2f1,stroke:#009688,stroke-width:2px,color:#00695c
+    classDef chat fill:#e3f2fd,stroke:#2196f3,stroke-width:2px,color:#1565c0
+    classDef match fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px,color:#6a1b9a
+    classDef outputGood fill:#c8e6c9,stroke:#388e3c,stroke-width:2px,color:#1b5e20
+    classDef outputFuzzy fill:#bbdefb,stroke:#1976d2,stroke-width:2px,color:#0d47a1
+    classDef outputRisk fill:#ffcdd2,stroke:#d32f2f,stroke-width:2px,color:#b71c1c
+    classDef decision fill:#fafafa,stroke:#757575,stroke-width:1px,color:#424242
+
+    START(["🎧 用户输入消息"]):::startEnd
+
+    %% ① 风险词
+    START --> D1{"① 风险词？<br/>涉政/色情/辱骂<br/>暴力/谣言等"}:::risk
+    D1 -- "✅ 是" --> R1["🚫 输出<br/>type: 风险<br/>content: 风险类别<br/>【拦截结束】"]:::outputRisk
+
+    %% ② 情绪
+    D1 -- "❌ 否" --> D2{"② 情绪激动？<br/>辱骂/催促/威胁"}:::emotion
+    D2 -- "✅ 是" --> EMO_CHECK{"含业务意图？"}:::emotion
+    EMO_CHECK -- "✅ 有业务意图" --> EMO_YES["😊 先安抚<br/>再提取业务问题<br/>→ 进入标准匹配 ⑦"]:::emotion
+    EMO_YES --> MATCH
+    EMO_CHECK -- "❌ 纯发泄" --> EMO_NO["😊 安抚回复<br/>引导说出问题<br/>【结束】"]:::emotion
+
+    %% ③ 身份
+    D2 -- "❌ 否" --> D3{"③ 询问身份？<br/>你是机器人吗<br/>你是真人吗"}:::identity
+    D3 -- "✅ 是" --> R3["🤖 固定模板<br/>我是腾讯客服<br/>智能小助手...<br/>【结束】"]:::identity
+
+    %% ④ 转人工
+    D3 -- "❌ 否" --> D4{"④ 要求转人工？"}:::transfer
+    D4 -- "✅ 是" --> D4B{"携带业务意图？"}:::transfer
+    D4B -- "✅ 如: QQ被盗转人工" --> D4_BIZ["📋 提取业务问题<br/>忽略转人工部分<br/>→ 进入标准匹配 ⑦"]:::transfer
+    D4_BIZ --> MATCH
+    D4B -- "❌ 如: 转人工/人工人工" --> D4_PURE["💬 安抚 + 反问引导<br/>6条模板轮换<br/>禁止连续重复<br/>【结束】"]:::transfer
+
+    %% ⑤ 否定
+    D4 -- "❌ 否" --> D5{"⑤ 否定回复？<br/>不是/不对/没有"}:::deny
+    D5 -- "✅ 是" --> D5B{"带新信息？<br/>不是,我是说XX"}:::deny
+    D5B -- "✅ 含新信息" --> D5_NEW["📋 提取新信息<br/>→ 进入标准匹配 ⑦"]:::deny
+    D5_NEW --> MATCH
+    D5B -- "❌ 纯否定" --> R5["📝 固定模板<br/>非常抱歉,可以<br/>再详细说下吗？<br/>【结束】"]:::deny
+
+    %% ⑥ 闲聊
+    D5 -- "❌ 否" --> D6{"⑥ 闲聊？<br/>你好/嗯/哦<br/>非业务内容"}:::chat
+    D6 -- "✅ 是" --> R6["💭 闲聊引导模板<br/>请问遇到什么<br/>QQ问题了呢？<br/>【结束】"]:::chat
+
+    %% ⑦ 标准匹配
+    D6 -- "❌ 否" --> MATCH
+
+    MATCH["⑦ 标准匹配流程<br/>─────────<br/>1⃣ 提取核心意图<br/>2⃣ 业务范围判断<br/>3⃣ 逐个意图匹配<br/>4⃣ 输出结果"]:::match
+
+    MATCH --> MATCH_R{"匹配结果？"}:::decision
+    MATCH_R -- "唯一匹配 ✅" --> OUT_YES["✅ type: 明确<br/>content: 意图ID"]:::outputGood
+    MATCH_R -- "无匹配 / 歧义 ❌" --> OUT_NO["❓ type: 模糊<br/>content: 反问话术<br/>关键词+场景举例<br/>≤60字"]:::outputFuzzy
+    MATCH_R -- "非QQ业务 🚫" --> OUT_CHAT["💭 闲聊引导<br/>引导回QQ问题<br/>【结束】"]:::chat
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-color" style="background:#ffcdd2"></div>① 风险拦截</div>
+  <div class="legend-item"><div class="legend-color" style="background:#fff3e0"></div>② 情绪安抚</div>
+  <div class="legend-item"><div class="legend-color" style="background:#fff8e1"></div>③ 身份询问</div>
+  <div class="legend-item"><div class="legend-color" style="background:#e8f5e9"></div>④ 转人工判断</div>
+  <div class="legend-item"><div class="legend-color" style="background:#e0f2f1"></div>⑤ 否定回复</div>
+  <div class="legend-item"><div class="legend-color" style="background:#e3f2fd"></div>⑥ 闲聊引导</div>
+  <div class="legend-item"><div class="legend-color" style="background:#f3e5f5"></div>⑦ 标准匹配</div>
+  <div class="legend-item"><div class="legend-color" style="background:#c8e6c9"></div>✅ 明确匹配</div>
+  <div class="legend-item"><div class="legend-color" style="background:#bbdefb"></div>❓ 模糊反问</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'default',
+    flowchart: {
+      useMaxWidth: false,
+      htmlLabels: true,
+      curve: 'basis',
+      rankSpacing: 60,
+      nodeSpacing: 30,
+      padding: 15
+    },
+    themeVariables: {
+      fontSize: '14px',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+    }
+  });
+</script>
+
+</body>
+</html>

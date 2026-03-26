@@ -906,17 +906,28 @@ function HomeContent() {
               titleColor: '#FFFFFF',
               edgeLabelBackground: '#1A1A1A',
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              fontSize: '14px',
             },
             flowchart: {
               curve: 'basis',
-              padding: 20,
+              padding: 25,
               useMaxWidth: false,
               htmlLabels: true,
+              rankSpacing: 70,
+              nodeSpacing: 40,
+              defaultRenderer: 'dagre-wrapper',
+            },
+            sequence: {
+              actorMargin: 50,
+              boxMargin: 10,
+              boxTextMargin: 5,
+              noteMargin: 10,
+              messageMargin: 35,
             },
             securityLevel: 'loose',
           });
           
-          // 清理代码
+          // 清理代码 - 保留 br 标签用于换行
           let cleanedCode = mermaidCode
             .replace(/[（）【】《》「」『』〈〉]/g, match => {
               const map: Record<string, string> = {
@@ -926,7 +937,6 @@ function HomeContent() {
               };
               return map[match] || match;
             })
-            .replace(/[，。！？、；：]/g, '')
             .trim();
           
           const id = `prompt-flowchart-${Date.now()}`;
