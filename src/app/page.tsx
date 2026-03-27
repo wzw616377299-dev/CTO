@@ -20,7 +20,8 @@ import {
   Download,
   RotateCcw,
   Move,
-  FolderDown
+  FolderDown,
+  FileCode
 } from 'lucide-react';
 import { analyzeApi, uploadApi, ocrApi, getUserId, recordsApi } from '@/lib/api';
 import Link from 'next/link';
@@ -103,6 +104,9 @@ function HomeContent() {
   
   // 下载代码状态
   const [isDownloadingCode, setIsDownloadingCode] = useState(false);
+  
+  // 导出HTML状态
+  const [isExportingHtml, setIsExportingHtml] = useState(false);
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -488,6 +492,38 @@ function HomeContent() {
     }
   };
 
+  // 导出本地HTML
+  const handleExportHtml = async () => {
+    setIsExportingHtml(true);
+    try {
+      const response = await fetch('/api/export-html', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.downloadUrl) {
+        // 直接打开下载链接
+        const fileResponse = await fetch(data.downloadUrl);
+        const blob = await fileResponse.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = data.fileName;
+        link.click();
+        window.URL.revokeObjectURL(blobUrl);
+      } else {
+        alert('导出失败：' + (data.error || '未知错误'));
+      }
+    } catch (error) {
+      console.error('Export HTML error:', error);
+      alert('导出失败，请稍后重试');
+    } finally {
+      setIsExportingHtml(false);
+    }
+  };
+
   // Markdown 渲染
   const renderMarkdown = (content: string, prefix?: React.ReactNode): React.ReactNode => {
     if (!content) return null;
@@ -838,6 +874,19 @@ function HomeContent() {
             >
               {isDownloadingCode ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderDown className="w-4 h-4" />}
               {isDownloadingCode ? '打包中...' : '下载代码'}
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="gap-2 border border-transparent transition-all" 
+              style={{ color: '#666666' }} 
+              onClick={handleExportHtml}
+              disabled={isExportingHtml}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#2C2C2C'; e.currentTarget.style.color = '#FFFFFF'; e.currentTarget.style.backgroundColor = '#1A1A1A'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.color = '#666666'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+            >
+              {isExportingHtml ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileCode className="w-4 h-4" />}
+              {isExportingHtml ? '导出中...' : '导出HTML'}
             </Button>
             <Link href="/history" className="group">
               <Button variant="ghost" size="sm" className="gap-2 border border-transparent transition-all" style={{ color: '#666666' }} 

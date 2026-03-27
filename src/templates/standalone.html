@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>首席技术官-老陈 | CTO助手</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #000; color: #E5E5E5; }
+    
+    .app { min-height: 100vh; display: flex; flex-direction: column; }
+    
+    /* Header */
+    .header { background: #0A0A0A; border-bottom: 1px solid #1A1A1A; padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; }
+    .logo { display: flex; align-items: center; gap: 12px; }
+    .logo img { width: 36px; height: 36px; border-radius: 8px; box-shadow: 0 0 0 2px rgba(7, 193, 96, 0.3); }
+    .logo-text { font-size: 18px; font-weight: 600; color: #FFF; }
+    .logo-subtitle { font-size: 12px; color: #4A4A4A; margin-left: 8px; }
+    .header-btn { background: transparent; border: 1px solid transparent; color: #666; padding: 8px 16px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 14px; transition: all 0.2s; }
+    .header-btn:hover { border-color: #2C2C2C; color: #FFF; background: #1A1A1A; }
+    
+    /* Main */
+    .main { flex: 1; display: flex; overflow: hidden; }
+    
+    /* Sidebar */
+    .sidebar { width: 400px; background: #121212; border-right: 1px solid #1A1A1A; padding: 20px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
+    
+    .section-title { font-size: 12px; color: #4A4A4A; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    
+    /* Scenario buttons */
+    .scenario-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .scenario-btn { padding: 10px 12px; border-radius: 8px; font-size: 14px; cursor: pointer; transition: all 0.2s; text-align: left; }
+    .scenario-btn.active { background: rgba(7, 193, 96, 0.1); color: #07C160; border: 1px solid rgba(7, 193, 96, 0.5); box-shadow: 0 0 10px rgba(7, 193, 96, 0.1); }
+    .scenario-btn:not(.active) { background: #141414; color: #666; border: 1px solid #2C2C2C; }
+    .scenario-btn:not(.active):hover { border-color: #3A3A3A; color: #A0A0A0; }
+    
+    /* Input area */
+    .input-area { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+    .input-label { font-size: 12px; color: #4A4A4A; text-transform: uppercase; letter-spacing: 1px; }
+    textarea { flex: 1; min-height: 200px; background: #0A0A0A; border: 1px solid #2C2C2C; border-radius: 12px; padding: 16px; color: #FFF; font-size: 15px; line-height: 1.6; resize: none; outline: none; }
+    textarea:focus { border-color: #07C160; }
+    textarea::placeholder { color: #4A4A4A; }
+    
+    /* Buttons */
+    .btn { padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; }
+    .btn-primary { background: #07C160; color: #000; border: none; }
+    .btn-primary:hover { background: #06A050; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-danger { background: #EF4444; color: #FFF; border: none; }
+    .btn-ghost { background: transparent; color: #666; border: 1px solid #2C2C2C; }
+    .btn-ghost:hover { background: #1A1A1A; color: #FFF; }
+    
+    /* Content */
+    .content { flex: 1; background: #000; padding: 40px; overflow-y: auto; display: flex; flex-direction: column; }
+    
+    /* Welcome */
+    .welcome { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px; }
+    .welcome-icon { width: 80px; height: 80px; background: #1A1A1A; border: 1px solid #2C2C2C; border-radius: 20px; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; }
+    .welcome-icon svg { width: 40px; height: 40px; color: #07C160; }
+    .welcome h2 { font-size: 24px; color: #FFF; margin-bottom: 12px; }
+    .welcome p { color: #666; font-size: 16px; max-width: 400px; line-height: 1.6; }
+    
+    /* Result */
+    .result { max-width: 800px; width: 100%; margin: 0 auto; }
+    .result-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #1A1A1A; }
+    .result-header h3 { font-size: 18px; color: #FFF; }
+    
+    /* Markdown styles */
+    .markdown { color: #A0A0A0; line-height: 1.8; }
+    .markdown h2 { font-size: 22px; color: #FFF; margin: 32px 0 16px; padding-left: 12px; border-left: 4px solid #07C160; }
+    .markdown h3 { font-size: 18px; color: #E5E5E5; margin: 24px 0 12px; padding-left: 10px; border-left: 3px solid #07C160; }
+    .markdown h4 { font-size: 16px; color: #E5E5E5; margin: 20px 0 10px; padding-left: 8px; border-left: 2px solid #07C160; }
+    .markdown p { margin: 12px 0; }
+    .markdown ul { margin: 16px 0; padding-left: 20px; }
+    .markdown li { margin: 8px 0; display: flex; gap: 12px; }
+    .markdown li::before { content: '•'; color: #07C160; font-weight: bold; }
+    .markdown ol { margin: 16px 0; padding-left: 20px; }
+    .markdown ol li { margin: 8px 0; display: flex; gap: 12px; }
+    .markdown code { background: #2C2C2C; color: #07C160; padding: 2px 6px; border-radius: 4px; font-family: 'SF Mono', 'Fira Code', monospace; }
+    .markdown pre { background: #141414; border: 1px solid #2C2C2C; border-radius: 8px; padding: 16px; margin: 16px 0; overflow-x: auto; }
+    .markdown pre code { background: none; padding: 0; color: #A0A0A0; }
+    .markdown blockquote { border-left: 2px solid #07C160; background: rgba(7, 193, 96, 0.05); padding: 12px 16px; margin: 16px 0; border-radius: 0 8px 8px 0; position: relative; }
+    .markdown blockquote .copy-btn { position: absolute; top: 8px; right: 8px; background: #2C2C2C; border: none; color: #666; padding: 4px 8px; border-radius: 4px; cursor: pointer; opacity: 0; transition: opacity 0.2s; }
+    .markdown blockquote:hover .copy-btn { opacity: 1; }
+    .markdown blockquote .copy-btn:hover { color: #FFF; }
+    .markdown hr { border: none; border-top: 1px solid #2C2C2C; margin: 24px 0; }
+    .markdown strong { color: #FFF; font-weight: 600; }
+    .markdown em { color: #FFF; font-style: normal; font-weight: 600; }
+    
+    /* Loading */
+    .loading { display: flex; align-items: center; gap: 12px; color: #666; padding: 20px; }
+    .spinner { width: 24px; height: 24px; border: 2px solid #2C2C2C; border-top-color: #07C160; border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    /* Follow up */
+    .follow-up { margin-top: 24px; padding-top: 24px; border-top: 1px solid #1A1A1A; }
+    .follow-up-input { display: flex; gap: 12px; }
+    .follow-up-input input { flex: 1; background: transparent; border: 1px solid #2C2C2C; border-radius: 8px; padding: 12px 16px; color: #FFF; font-size: 14px; outline: none; }
+    .follow-up-input input:focus { border-color: #07C160; }
+    .follow-up-input input::placeholder { color: #4A4A4A; }
+    
+    /* Api config notice */
+    .api-notice { background: #1A1A1A; border: 1px solid #2C2C2C; border-radius: 12px; padding: 16px; margin-bottom: 20px; }
+    .api-notice-title { color: #07C160; font-weight: 600; margin-bottom: 8px; }
+    .api-notice-text { color: #666; font-size: 13px; line-height: 1.6; }
+    .api-notice code { background: #0A0A0A; padding: 2px 6px; border-radius: 4px; color: #07C160; }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+      .main { flex-direction: column; }
+      .sidebar { width: 100%; border-right: none; border-bottom: 1px solid #1A1A1A; }
+      .content { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="text/babel">
+    const { useState, useRef, useEffect } = React;
+    
+    // API 基础地址 - 请修改为您的服务器地址
+    const API_BASE_URL = '{{API_BASE_URL}}';
+    
+    // 场景配置
+    const SCENARIOS = [
+      { id: 'work', name: '企微沟通', desc: '解读技术对话' },
+      { id: 'understand', name: '技术理解', desc: '理解技术方案' },
+      { id: 'concept', name: '概念梳理', desc: '学习技术概念' },
+      { id: 'report', name: '汇报框架', desc: '准备汇报内容' },
+      { id: 'code', name: '代码梳理', desc: '理解代码逻辑' },
+      { id: 'prompt', name: 'Prompt梳理', desc: '理解AI思考' },
+    ];
+    
+    // 图标组件
+    const Icons = {
+      Send: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>,
+      Stop: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>,
+      Copy: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>,
+      Check: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20,6 9,17 4,12"/></svg>,
+      Message: () => <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>,
+    };
+    
+    // 简单的 Markdown 渲染
+    function renderMarkdown(content) {
+      if (!content) return null;
+      
+      const lines = content.split('\n');
+      const elements = [];
+      let i = 0;
+      let key = 0;
+      
+      const renderInline = (text) => {
+        if (!text) return text;
+        // 处理行内代码
+        text = text.replace(/`([^`]+)`/g, (m, code) => `<code>${code}</code>`);
+        // 处理 ***text***
+        text = text.replace(/\*\*\*([^*]+)\*\*\*/g, (m, t) => `<em>${t}</em>`);
+        // 处理 **text**
+        text = text.replace(/\*\*([^*]+)\*\*/g, (m, t) => `<strong>${t}</strong>`);
+        // 处理 *text*
+        text = text.replace(/\*([^*]+)\*/g, (m, t) => `<strong style="color:#07C160">${t}</strong>`);
+        return <span dangerouslySetInnerHTML={{__html: text}} />;
+      };
+      
+      while (i < lines.length) {
+        const line = lines[i];
+        
+        if (line.trim() === '') { i++; continue; }
+        if (line.trim() === '---') { elements.push(<hr key={key++} />); i++; continue; }
+        
+        // 代码块
+        if (line.startsWith('```')) {
+          const codeLines = [];
+          i++;
+          while (i < lines.length && !lines[i].startsWith('```')) {
+            codeLines.push(lines[i]);
+            i++;
+          }
+          i++;
+          elements.push(<pre key={key++}><code>{codeLines.join('\n')}</code></pre>);
+          continue;
+        }
+        
+        // 标题
+        if (line.startsWith('### ')) { elements.push(<h4 key={key++}>{renderInline(line.slice(4))}</h4>); i++; continue; }
+        if (line.startsWith('## ')) { elements.push(<h3 key={key++}>{renderInline(line.slice(3))}</h3>); i++; continue; }
+        if (line.startsWith('# ')) { elements.push(<h2 key={key++}>{renderInline(line.slice(2))}</h2>); i++; continue; }
+        
+        // 引用
+        if (line.startsWith('> ')) {
+          const quoteLines = [];
+          while (i < lines.length && lines[i].startsWith('> ')) {
+            quoteLines.push(lines[i].slice(2));
+            i++;
+          }
+          elements.push(<blockquote key={key++}>{renderInline(quoteLines.join('\n'))}</blockquote>);
+          continue;
+        }
+        
+        // 列表
+        if (line.startsWith('- ')) {
+          const items = [];
+          while (i < lines.length && lines[i].startsWith('- ')) {
+            items.push(lines[i].slice(2));
+            i++;
+          }
+          elements.push(<ul key={key++}>{items.map((item, idx) => <li key={idx}>{renderInline(item)}</li>)}</ul>);
+          continue;
+        }
+        
+        // 有序列表
+        const orderedMatch = line.match(/^(\d+)\.\s/);
+        if (orderedMatch) {
+          const items = [];
+          while (i < lines.length) {
+            const m = lines[i].match(/^(\d+)\.\s/);
+            if (m) { items.push(lines[i].replace(/^\d+\.\s/, '')); i++; }
+            else break;
+          }
+          elements.push(<ol key={key++}>{items.map((item, idx) => <li key={idx}>{idx + 1}. {renderInline(item)}</li>)}</ol>);
+          continue;
+        }
+        
+        // 普通段落
+        elements.push(<p key={key++}>{renderInline(line)}</p>);
+        i++;
+      }
+      
+      return elements;
+    }
+    
+    // 主应用
+    function App() {
+      const [inputText, setInputText] = useState('');
+      const [selectedScenarios, setSelectedScenarios] = useState(['work', 'understand', 'concept']);
+      const [isAnalyzing, setIsAnalyzing] = useState(false);
+      const [result, setResult] = useState('');
+      const [copiedText, setCopiedText] = useState(null);
+      const [followUpText, setFollowUpText] = useState('');
+      const [conversationHistory, setConversationHistory] = useState([]);
+      
+      const abortControllerRef = useRef(null);
+      
+      const toggleScenario = (id) => {
+        setSelectedScenarios(prev => 
+          prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]
+        );
+      };
+      
+      const copyText = async (text) => {
+        await navigator.clipboard.writeText(text);
+        setCopiedText(text);
+        setTimeout(() => setCopiedText(null), 2000);
+      };
+      
+      const handleAnalyze = async () => {
+        if (!inputText.trim() || isAnalyzing) return;
+        
+        setIsAnalyzing(true);
+        setResult('');
+        
+        const scenario = selectedScenarios[0] || 'work';
+        
+        try {
+          abortControllerRef.current = new AbortController();
+          
+          const response = await fetch(`${API_BASE_URL}/api/analyze`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              inputText,
+              scenario,
+              saveRecord: false,
+              userId: 'local-user',
+            }),
+            signal: abortControllerRef.current.signal,
+          });
+          
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let fullContent = '';
+          
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+            
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6);
+                if (data === '[DONE]') continue;
+                try {
+                  const parsed = JSON.parse(data);
+                  if (parsed.content) {
+                    fullContent += parsed.content;
+                    setResult(fullContent);
+                  }
+                } catch (e) {}
+              }
+            }
+          }
+          
+          setConversationHistory([
+            { role: 'user', content: inputText },
+            { role: 'assistant', content: fullContent },
+          ]);
+          
+        } catch (error) {
+          if (error.name !== 'AbortError') {
+            console.error('Analysis error:', error);
+            setResult('分析失败，请检查网络连接或API配置。');
+          }
+        } finally {
+          setIsAnalyzing(false);
+          abortControllerRef.current = null;
+        }
+      };
+      
+      const handleStop = () => {
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
+      };
+      
+      const handleFollowUp = async () => {
+        if (!followUpText.trim() || isAnalyzing) return;
+        
+        setIsAnalyzing(true);
+        const newHistory = [...conversationHistory, { role: 'user', content: followUpText }];
+        setFollowUpText('');
+        
+        try {
+          abortControllerRef.current = new AbortController();
+          
+          const response = await fetch(`${API_BASE_URL}/api/analyze`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              inputText: followUpText,
+              scenario: selectedScenarios[0] || 'work',
+              saveRecord: false,
+              userId: 'local-user',
+              isFollowUp: true,
+              history: conversationHistory,
+            }),
+            signal: abortControllerRef.current.signal,
+          });
+          
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let fullContent = conversationHistory[conversationHistory.length - 1]?.content || '';
+          
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+            
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6);
+                if (data === '[DONE]') continue;
+                try {
+                  const parsed = JSON.parse(data);
+                  if (parsed.content) {
+                    fullContent += parsed.content;
+                    setResult(fullContent);
+                  }
+                } catch (e) {}
+              }
+            }
+          }
+          
+          setConversationHistory([
+            ...newHistory,
+            { role: 'assistant', content: fullContent },
+          ]);
+          
+        } catch (error) {
+          if (error.name !== 'AbortError') {
+            console.error('Follow up error:', error);
+          }
+        } finally {
+          setIsAnalyzing(false);
+          abortControllerRef.current = null;
+        }
+      };
+      
+      return (
+        <div className="app">
+          <header className="header">
+            <div className="logo">
+              <img src={`${API_BASE_URL}/avatar.png`} alt="CTO" />
+              <span className="logo-text">首席技术官-老陈</span>
+              <span className="logo-subtitle">CTO</span>
+            </div>
+          </header>
+          
+          <main className="main">
+            <aside className="sidebar">
+              <div>
+                <div className="section-title">场景选择</div>
+                <div className="scenario-grid">
+                  {SCENARIOS.map(s => (
+                    <button
+                      key={s.id}
+                      className={`scenario-btn ${selectedScenarios.includes(s.id) ? 'active' : ''}`}
+                      onClick={() => toggleScenario(s.id)}
+                    >
+                      <div style={{fontWeight: 500}}>{s.name}</div>
+                      <div style={{fontSize: 12, opacity: 0.7}}>{s.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="input-area">
+                <div className="input-label">输入内容</div>
+                <textarea
+                  placeholder="粘贴技术对话、代码或描述你的问题..."
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                />
+                
+                <div style={{display: 'flex', gap: 12}}>
+                  {isAnalyzing ? (
+                    <button className="btn btn-danger" onClick={handleStop}>
+                      <Icons.Stop /> 停止
+                    </button>
+                  ) : (
+                    <button 
+                      className="btn btn-primary" 
+                      onClick={handleAnalyze}
+                      disabled={!inputText.trim()}
+                    >
+                      <Icons.Send /> 开始分析
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              <div className="api-notice">
+                <div className="api-notice-title">📡 API 配置</div>
+                <div className="api-notice-text">
+                  当前连接到: <code>{API_BASE_URL}</code><br/>
+                  如需修改，请编辑 HTML 文件中的 <code>API_BASE_URL</code> 变量。
+                </div>
+              </div>
+            </aside>
+            
+            <div className="content">
+              {!result && !isAnalyzing ? (
+                <div className="welcome">
+                  <div className="welcome-icon">
+                    <Icons.Message />
+                  </div>
+                  <h2>你好，我是老陈</h2>
+                  <p>我可以帮你理解技术对话、分析代码逻辑、梳理AI思考过程。粘贴内容，选择场景，开始分析。</p>
+                </div>
+              ) : (
+                <div className="result">
+                  <div className="result-header">
+                    <h3>分析结果</h3>
+                  </div>
+                  
+                  <div className="markdown">
+                    {renderMarkdown(result)}
+                  </div>
+                  
+                  {isAnalyzing && (
+                    <div className="loading">
+                      <div className="spinner"></div>
+                      <span>分析中...</span>
+                    </div>
+                  )}
+                  
+                  {!isAnalyzing && result && (
+                    <div className="follow-up">
+                      <div className="follow-up-input">
+                        <input
+                          placeholder="继续追问..."
+                          value={followUpText}
+                          onChange={(e) => setFollowUpText(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleFollowUp()}
+                        />
+                        <button 
+                          className="btn btn-primary"
+                          onClick={handleFollowUp}
+                          disabled={!followUpText.trim()}
+                        >
+                          <Icons.Send />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </main>
+        </div>
+      );
+    }
+    
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
