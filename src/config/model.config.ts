@@ -85,6 +85,7 @@ export function getModelByScenario(scenario: string): { model: string; temperatu
       return MODEL_CONFIG.code;
     case 'prompt':
       return MODEL_CONFIG.prompt;
+    case 'smart':
     case 'work':
     case 'understand':
     case 'concept':
