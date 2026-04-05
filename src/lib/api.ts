@@ -20,6 +20,39 @@ const getHeaders = () => ({
   'x-user-id': getUserId(),
 });
 
+// Auth API
+export const authApi = {
+  register: async (username: string, password: string) => {
+    const response = await fetch(getApiUrl('/auth/register'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    return response.json();
+  },
+
+  login: async (username: string, password: string) => {
+    const response = await fetch(getApiUrl('/auth/login'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    return response.json();
+  },
+
+  logout: async () => {
+    const response = await fetch(getApiUrl('/auth/logout'), {
+      method: 'POST',
+    });
+    return response.json();
+  },
+
+  getCurrentUser: async () => {
+    const response = await fetch(getApiUrl('/auth/me'));
+    return response.json();
+  },
+};
+
 // User API
 export const userApi = {
   get: async () => {

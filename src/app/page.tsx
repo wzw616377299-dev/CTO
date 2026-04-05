@@ -4,6 +4,8 @@ import React, { useState, useRef, useCallback, useEffect, Suspense } from 'react
 import { flushSync } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+// Import Card components
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   ArrowUp, 
   Image as ImageIcon, 
@@ -22,8 +24,10 @@ import {
   Move
 } from 'lucide-react';
 import { analyzeApi, uploadApi, ocrApi, getUserId, recordsApi } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 interface ImageItem {
   id: string;
@@ -74,6 +78,7 @@ const COLORS = {
 };
 
 function HomeContent() {
+  const { user, loading, logout } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const recordId = searchParams.get('recordId');
@@ -759,6 +764,52 @@ function HomeContent() {
   const isProcessing = isAnalyzing || isOcring || isFollowUp || isLoadingRecord;
   const canAnalyze = inputText.trim().length > 0 || images.length > 0;
 
+  // 如果未登录且不在加载中，显示登录提示
+  if (!loading && !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
+        <Card className="w-full max-w-md shadow-xl">
+          <CardHeader className="space-y-1 text-center">
+            <CardTitle className="text-2xl font-bold">欢迎使用首席技术官-老陈</CardTitle>
+            <CardDescription>
+              产品经理技术沟通助手，帮助理解技术概念、分析沟通意图
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-3 p-4 rounded-lg bg-muted">
+              <img 
+                src="/avatar.png"
+                alt="CTO"
+                className="w-12 h-12 rounded-lg object-cover"
+              />
+              <div>
+                <p className="font-medium">首席技术官-老陈</p>
+                <p className="text-sm text-muted-foreground">AI 助手</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground text-center">
+                登录后即可开始使用
+              </p>
+            </div>
+          </CardContent>
+          <CardFooter className="flex flex-col gap-3">
+            <Link href="/login" className="w-full">
+              <Button className="w-full">
+                登录
+              </Button>
+            </Link>
+            <Link href="/register" className="w-full">
+              <Button variant="outline" className="w-full">
+                注册新账户
+              </Button>
+            </Link>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen flex flex-col" style={{ backgroundColor: '#000000', color: '#E5E5E5' }}>
       {isDragging && (
@@ -787,13 +838,61 @@ function HomeContent() {
               <span className="text-xs ml-2" style={{ color: '#4A4A4A' }}>CTO</span>
             </div>
           </div>
-          <Link href="/history" className="group">
-            <Button variant="ghost" size="sm" className="gap-2 border border-transparent transition-all" style={{ color: '#666666' }} 
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#2C2C2C'; e.currentTarget.style.color = '#FFFFFF'; e.currentTarget.style.backgroundColor = '#1A1A1A'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.color = '#666666'; e.currentTarget.style.backgroundColor = 'transparent'; }}>
-              <Clock className="w-4 h-4" />历史记录
-            </Button>
-          </Link>
+          <div className="flex items-center gap-3">
+            {loading ? (
+              <div className="flex items-center gap-2" style={{ color: '#666666' }}>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">加载中...</span>
+              </div>
+            ) : user ? (
+              <>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ backgroundColor: '#1A1A1A', border: '1px solid #2C2C2C' }}>
+                  <span className="text-sm" style={{ color: '#FFFFFF' }}>{user.username}</span>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="gap-2 border border-transparent transition-all" 
+                  style={{ color: '#666666' }} 
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#2C2C2C'; e.currentTarget.style.color = '#FFFFFF'; e.currentTarget.style.backgroundColor = '#1A1A1A'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.color = '#666666'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+                  onClick={async () => {
+                    await logout();
+                    toast.success('已退出登录');
+                  }}
+                >
+                  退出
+                </Button>
+              </>
+            ) : (
+              <>
+                <Link href="/login">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="gap-2 border border-transparent transition-all" 
+                    style={{ color: '#666666' }} 
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#2C2C2C'; e.currentTarget.style.color = '#FFFFFF'; e.currentTarget.style.backgroundColor = '#1A1A1A'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.color = '#666666'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+                  >
+                    登录
+                  </Button>
+                </Link>
+                <Link href="/register">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="gap-2 transition-all" 
+                    style={{ color: '#FFFFFF', backgroundColor: COLORS.primary }} 
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(7, 193, 96, 0.8)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = COLORS.primary; }}
+                  >
+                    注册
+                  </Button>
+                </Link>
+              </>
+            )}
+          </div>
         </div>
       </header>
 
