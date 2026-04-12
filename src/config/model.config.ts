@@ -2,6 +2,7 @@
  * 模型配置中心
  * 
  * 更新日志：
+ * - 2025-04-11: 更换为更快模型，提升响应速度
  * - 2025-03-26: 增加场景级模型选择，代码梳理使用 Kimi 模型
  * - 2025-03-23: 初始配置，使用 doubao-seed-2-0-pro-260215
  * 
@@ -11,15 +12,16 @@
  * 3. deepseek-v3-2-251201 - DeepSeek V3.2，高级推理
  * 4. doubao-seed-1-8-251228 - 多模态 Agent 优化
  * 5. doubao-seed-1-6-vision-250815 - 图像/视频理解
+ * 6. doubao-seed-2-0-mini-260215 - 轻量快速模型
  */
 
 // 模型优先级配置
 export const MODEL_CONFIG = {
-  // 主模型 - 用于核心分析任务
+  // 主模型 - 用于核心分析任务（已更换为快速版本）
   primary: {
-    model: 'doubao-seed-2-0-pro-260215',
+    model: 'doubao-seed-2-0-mini-260215',
     temperature: 0.7,
-    description: '豆包旗舰模型 - 复杂推理、长上下文',
+    description: '豆包轻量模型 - 快速响应，适合日常沟通',
     lastUpdated: '2025-02-15',
   },
   
@@ -56,11 +58,11 @@ export const MODEL_CONFIG = {
     lastUpdated: '2025-01-27',
   },
 
-  // Prompt 分析 - 适合复杂推理
+  // Prompt 分析 - 适合复杂推理（改用快速模型）
   prompt: {
-    model: 'doubao-seed-2-0-pro-260215',
+    model: 'doubao-seed-2-0-mini-260215',
     temperature: 0.5,
-    description: '豆包旗舰模型 - Prompt结构分析',
+    description: '豆包轻量模型 - Prompt结构分析（快速版）',
     lastUpdated: '2025-02-15',
   },
 } as const;
