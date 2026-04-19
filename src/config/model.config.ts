@@ -1,86 +1,84 @@
 /**
- * 模型配置中心
- * 
- * 更新日志：
- * - 2025-04-11: 更换为更快模型，提升响应速度
- * - 2025-03-26: 增加场景级模型选择，代码梳理使用 Kimi 模型
- * - 2025-03-23: 初始配置，使用 doubao-seed-2-0-pro-260215
- * 
- * 可用模型列表（按推荐程度排序）：
- * 1. doubao-seed-2-0-pro-260215 - 旗舰模型，复杂推理（最新 2025-02-15）
- * 2. kimi-k2-5-260127 - Kimi 最强模型，Agent/代码/视觉（2025-01-27）
- * 3. deepseek-v3-2-251201 - DeepSeek V3.2，高级推理
- * 4. doubao-seed-1-8-251228 - 多模态 Agent 优化
- * 5. doubao-seed-1-6-vision-250815 - 图像/视频理解
- * 6. doubao-seed-2-0-mini-260215 - 轻量快速模型
+ * 模型配置中心（TokenHub 版）
+ *
+ * 全部调用走 https://tokenhub.tencentmaas.com/v1/chat/completions
+ * 通过 .env.local 的 TOKENHUB_API_KEY 鉴权。
+ *
+ * 2026-04-19 调整：
+ *  - 按腾讯云 TokenHub 可用列表做分层：
+ *    analyze  -> deepseek-v3.1-terminus（分析主力，推理稳）
+ *    title    -> glm-5-turbo（轻任务，最低延迟）
+ *    vision   -> kimi-k2.5（支持多模态图片输入）
+ *    code     -> kimi-k2.5（代码领域强）
+ *    prompt   -> hunyuan-2.0-thinking（思考链路化）
+ *    fallback -> glm-5（综合备选）
+ *
+ *  - 注意：Kimi K2.5 网关要求 temperature 固定为 1。
  */
 
-// 模型优先级配置
 export const MODEL_CONFIG = {
-  // 主模型 - 用于核心分析任务（已更换为快速版本）
+  // 主模型 - 主攻速度：TokenHub 列表里 glm-5-turbo TTFB 和 TPS 最优
   primary: {
-    model: 'doubao-seed-2-0-mini-260215',
-    temperature: 0.7,
-    description: '豆包轻量模型 - 快速响应，适合日常沟通',
-    lastUpdated: '2025-02-15',
+    model: 'glm-5-turbo',
+    temperature: 0.5,
+    description: 'GLM-5 Turbo - 首包最快，适合流式打字机体验',
+    lastUpdated: '2026-04',
   },
-  
-  // 备选模型 - 当主模型不可用时
+
+  // 备选模型 - 主模型异常时兜底（质量取向）
   fallback: {
-    model: 'kimi-k2-5-260127',
-    temperature: 0.6, // Kimi K2.5 要求固定 0.6 或 1.0
-    description: 'Kimi K2.5 - Agent/代码/视觉全能',
-    lastUpdated: '2025-01-27',
+    model: 'deepseek-v3.1-terminus',
+    temperature: 0.6,
+    description: 'DeepSeek V3.1 Terminus - 推理质量兜底',
+    lastUpdated: '2025-11',
   },
-  
-  // 标题生成 - 简单任务用轻量模型
+
+  // 标题生成 - 轻量 & 低延迟
   title: {
-    model: 'doubao-seed-2-0-mini-260215',
+    model: 'glm-5-turbo',
     temperature: 0.3,
-    description: '豆包轻量模型 - 快速响应',
-    lastUpdated: '2025-02-15',
+    description: 'GLM-5 Turbo - 轻量低延迟，用于标题等短文本任务',
+    lastUpdated: '2025',
   },
-  
-  // OCR/图像理解
+
+  // OCR / 图像理解 - 多模态
   vision: {
-    model: 'doubao-seed-1-6-vision-250815',
-    temperature: 0.5,
-    description: '豆包视觉模型 - 图像/视频理解',
-    lastUpdated: '2024-08-15',
+    model: 'kimi-k2.5',
+    temperature: 1,
+    description: 'Kimi K2.5 - 支持 image_url 多模态输入（网关要求 temperature=1）',
+    lastUpdated: '2025',
   },
 
-  // 代码理解 - 适合代码分析和梳理
-  // Kimi K2.5 是代码领域最强模型
+  // 代码理解
   code: {
-    model: 'kimi-k2-5-260127',
-    temperature: 0.6, // Kimi K2.5 要求固定 0.6（非thinking）或 1.0（thinking）
-    description: 'Kimi K2.5 - 代码理解专家（代码领域最强）',
-    lastUpdated: '2025-01-27',
+    model: 'kimi-k2.5',
+    temperature: 1,
+    description: 'Kimi K2.5 - 代码理解专家（网关要求 temperature=1）',
+    lastUpdated: '2025',
   },
 
-  // Prompt 分析 - 适合复杂推理（改用快速模型）
+  // Prompt 分析 - 思考型更合适
   prompt: {
-    model: 'doubao-seed-2-0-mini-260215',
+    model: 'hunyuan-2.0-thinking-20251109',
     temperature: 0.5,
-    description: '豆包轻量模型 - Prompt结构分析（快速版）',
-    lastUpdated: '2025-02-15',
+    description: '腾讯混元 2.0 Thinking - 思考链路化，适合 Prompt 拆解',
+    lastUpdated: '2025-11-09',
   },
 } as const;
 
-// 当前生效的模型版本
 export const CURRENT_MODEL_VERSION = {
   primary: MODEL_CONFIG.primary.model,
   fallback: MODEL_CONFIG.fallback.model,
-  lastReviewDate: '2025-03-26',
-  nextReviewDate: '2025-03-27',
+  lastReviewDate: '2026-04-19',
+  nextReviewDate: '2026-05-19',
 };
 
-// 获取模型配置
-export function getModelConfig(type: 'primary' | 'fallback' | 'title' | 'vision' | 'code' | 'prompt' = 'primary') {
+export function getModelConfig(
+  type: 'primary' | 'fallback' | 'title' | 'vision' | 'code' | 'prompt' = 'primary'
+) {
   return MODEL_CONFIG[type];
 }
 
-// 根据场景获取模型配置
 export function getModelByScenario(scenario: string): { model: string; temperature: number } {
   switch (scenario) {
     case 'code':
@@ -97,29 +95,13 @@ export function getModelByScenario(scenario: string): { model: string; temperatu
   }
 }
 
-// 模型选择建议
 export const MODEL_RECOMMENDATIONS = {
-  // 复杂推理、多步规划
-  complexReasoning: 'doubao-seed-2-0-pro-260215',
-  
-  // 代码生成、Agent 任务
-  codeAndAgent: 'kimi-k2-5-260127',
-  
-  // 高级推理、数学逻辑
-  advancedReasoning: 'deepseek-v3-2-251201',
-  
-  // 图像/视频理解
-  vision: 'doubao-seed-1-6-vision-250815',
-  
-  // 长文本处理
-  longContext: 'kimi-k2-250905',
-  
-  // 快速响应、高并发
-  fastResponse: 'doubao-seed-2-0-mini-260215',
-
-  // Prompt 结构分析
-  promptAnalysis: 'doubao-seed-2-0-pro-260215',
-
-  // 代码理解
-  codeAnalysis: 'kimi-k2-5-260127',
+  complexReasoning: 'deepseek-v3.1-terminus',
+  codeAndAgent: 'kimi-k2.5',
+  advancedReasoning: 'deepseek-r1-0528',
+  vision: 'kimi-k2.5',
+  longContext: 'kimi-k2.5',
+  fastResponse: 'glm-5-turbo',
+  promptAnalysis: 'hunyuan-2.0-thinking-20251109',
+  codeAnalysis: 'kimi-k2.5',
 };

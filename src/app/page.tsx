@@ -31,13 +31,6 @@ interface Message {
   content: string;
 }
 
-const SCENARIOS = [
-  { id: 'smart', label: '智能分析' },
-  { id: 'report', label: '汇报框架' },
-  { id: 'prompt', label: 'Prompt梳理' },
-  { id: 'code', label: '代码梳理' },
-];
-
 const MAX_IMAGES = 20;
 
 // 暗黑模式配色方案
@@ -72,8 +65,8 @@ function HomeContent() {
   const recordId = searchParams.get('recordId');
   
   const [inputText, setInputText] = useState('');
+  const [extraContext, setExtraContext] = useState('');
   const [images, setImages] = useState<ImageItem[]>([]);
-  const [selectedScenarios, setSelectedScenarios] = useState<string[]>(['work', 'understand', 'concept']);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isOcring, setIsOcring] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<string>('');
@@ -90,6 +83,11 @@ function HomeContent() {
   
   // 用户滚动状态
   const [userScrolled, setUserScrolled] = useState(false);
+  // 左栏宽度（可拖拽）
+  const [leftWidth, setLeftWidth] = useState<number>(420);
+  const isResizingRef = useRef(false);
+  // 等待阶段文案
+  const [waitingStage, setWaitingStage] = useState(0);
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -108,11 +106,12 @@ function HomeContent() {
         try {
           const parsed = JSON.parse(savedData);
           if (parsed.inputText) setInputText(parsed.inputText);
+          if (parsed.extraContext) setExtraContext(parsed.extraContext);
           if (parsed.images) setImages(parsed.images);
-          if (parsed.scenarios) setSelectedScenarios(parsed.scenarios);
           if (parsed.analysisResult) setAnalysisResult(parsed.analysisResult);
           if (parsed.topicTitle) setTopicTitle(parsed.topicTitle);
           if (parsed.conversationHistory) setConversationHistory(parsed.conversationHistory);
+          if (typeof parsed.leftWidth === 'number') setLeftWidth(parsed.leftWidth);
         } catch {}
       }
     }
@@ -120,21 +119,22 @@ function HomeContent() {
   
   // 保存数据到 localStorage - 使用防抖优化
   useEffect(() => {
-    if (!recordId && (inputText || images.length > 0 || analysisResult)) {
+    if (!recordId && (inputText || extraContext || images.length > 0 || analysisResult)) {
       const timer = setTimeout(() => {
         localStorage.setItem('cto_current_session', JSON.stringify({
           inputText,
+          extraContext,
           images,
-          scenarios: selectedScenarios,
           analysisResult,
           topicTitle,
           conversationHistory,
+          leftWidth,
         }));
       }, 500); // 500ms 防抖
-      
+
       return () => clearTimeout(timer);
     }
-  }, [inputText, images, selectedScenarios, analysisResult, topicTitle, conversationHistory, recordId]);
+  }, [inputText, extraContext, images, analysisResult, topicTitle, conversationHistory, leftWidth, recordId]);
   
   // 加载历史记录
   useEffect(() => {
@@ -147,11 +147,6 @@ function HomeContent() {
             const record = result.record;
             setInputText(record.input_text || '');
             setTopicTitle(record.title || '');
-            // 解析多场景
-            if (record.mode) {
-              const modes = record.mode.split(',');
-              setSelectedScenarios(modes.length > 0 ? modes : ['work', 'understand', 'concept']);
-            }
             
             const history: Message[] = [];
             if (record.input_text) {
@@ -263,21 +258,13 @@ function HomeContent() {
 
   const removeImage = (id: string) => setImages(prev => prev.filter(img => img.id !== id));
   
-  const toggleScenario = (id: string) => {
-    setSelectedScenarios(prev => 
-      prev.includes(id) 
-        ? prev.filter(s => s !== id) 
-        : [...prev, id]
-    );
-  };
-  
   const clearAll = () => {
     setInputText('');
+    setExtraContext('');
     setImages([]);
     setAnalysisResult('');
     setConversationHistory([]);
     setTopicTitle('');
-    setSelectedScenarios(['work', 'understand', 'concept']);
     localStorage.removeItem('cto_current_session');
   };
   
@@ -306,31 +293,33 @@ function HomeContent() {
       
       if (!finalText.trim()) { setIsAnalyzing(false); return; }
       
-      // 先生成主题标题
-      let title = '';
+      // 标题和分析并行：先挂一个异步任务，不等它返回就直接启动分析流
       setIsGeneratingTitle(true);
-      try {
-        const titleResponse = await fetch('/api/title', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ inputText: finalText }),
-        });
-        const titleData = await titleResponse.json();
-        if (titleData.title) {
-          title = titleData.title;
-          setTopicTitle(title);
-        }
-      } catch {
-        // 失败时使用简单截取
-        title = finalText.replace(/\n/g, ' ').slice(0, 20);
-        setTopicTitle(title + (finalText.length > 20 ? '...' : ''));
-      } finally {
-        setIsGeneratingTitle(false);
-      }
-      
+      const titlePromise = fetch('/api/title', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inputText: finalText }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          const t = (data && typeof data.title === 'string' ? data.title : '').trim();
+          if (t) setTopicTitle(t);
+          return t;
+        })
+        .catch(() => {
+          const fallback = finalText.replace(/\n/g, ' ').slice(0, 20);
+          setTopicTitle(fallback + (finalText.length > 20 ? '...' : ''));
+          return '';
+        })
+        .finally(() => setIsGeneratingTitle(false));
+
       abortControllerRef.current = new AbortController();
-      const scenario = selectedScenarios.join(',');
-      const stream = await analyzeApi.stream(finalText, scenario, abortControllerRef.current.signal, title);
+      // 用空标题先发请求，服务端把它当 null 就行；正式标题由前端自己展示
+      const stream = await analyzeApi.stream(finalText, '', abortControllerRef.current.signal, '');
+      // 异步拿一下最终标题，不阻塞流
+      const title = await titlePromise;
+      // 如果 title 接口比分析快，已经显示；否则下面这段保险一下兜底
+      if (title) setTopicTitle(title);
       if (!stream) throw new Error('No stream');
       
       const reader = stream.getReader();
@@ -348,6 +337,13 @@ function HomeContent() {
             if (data === '[DONE]') continue;
             try {
               const parsed = JSON.parse(data);
+              if (parsed.reset) {
+                fullContent = '';
+                flushSync(() => {
+                  setAnalysisResult('');
+                });
+                continue;
+              }
               if (parsed.content) {
                 fullContent += parsed.content;
                 // 使用 flushSync 强制立即渲染，实现真正的流式输出
@@ -371,7 +367,7 @@ function HomeContent() {
       abortControllerRef.current = null;
       ocrAbortControllerRef.current = null;
     }
-  }, [inputText, images, selectedScenarios]);
+  }, [inputText, extraContext, images]);
 
   const handleFollowUp = useCallback(async () => {
     if (!followUpText.trim() || conversationHistory.length === 0) return;
@@ -387,8 +383,7 @@ function HomeContent() {
     
     try {
       abortControllerRef.current = new AbortController();
-      const scenario = selectedScenarios.join(',');
-      const stream = await analyzeApi.followUp(newHistory, userQuestion, scenario, abortControllerRef.current.signal);
+      const stream = await analyzeApi.followUp(newHistory, userQuestion, '', abortControllerRef.current.signal);
       if (!stream) throw new Error('No stream');
       
       const reader = stream.getReader();
@@ -427,7 +422,7 @@ function HomeContent() {
       }
     } catch {}
     finally { setIsFollowUp(false); abortControllerRef.current = null; }
-  }, [followUpText, conversationHistory, selectedScenarios]);
+  }, [followUpText, conversationHistory]);
 
   const handleStop = useCallback(() => {
     abortControllerRef.current?.abort();
@@ -750,7 +745,7 @@ function HomeContent() {
   };
 
   const isProcessing = isAnalyzing || isOcring || isFollowUp || isLoadingRecord;
-  const canAnalyze = inputText.trim().length > 0 || images.length > 0;
+  const canAnalyze = true; // 空输入也允许，老陈会挑个技术场景主动讲解
 
   return (
     <div className="h-screen flex flex-col" style={{ backgroundColor: '#000000', color: '#E5E5E5' }}>
@@ -788,31 +783,14 @@ function HomeContent() {
         </div>
       </header>
 
-      <main className="flex-1 flex overflow-hidden justify-center">
-        <div className="w-full max-w-[1800px] flex">
+      <main className="flex-1 flex overflow-hidden">
+        <div className="w-full flex">
           {/* Left: Input */}
-          <div className="w-[420px] shrink-0 flex flex-col" style={{ backgroundColor: '#121212', borderRight: '1px solid #1A1A1A' }}>
+          <div
+            className="shrink-0 flex flex-col"
+            style={{ width: leftWidth, backgroundColor: '#121212', borderRight: '1px solid #1A1A1A' }}
+          >
             <div className="p-5 flex-1 flex flex-col min-h-0">
-              {/* Scenario - 多选 */}
-              <div className="mb-5">
-                <div className="text-xs mb-2 uppercase tracking-wider" style={{ color: '#4A4A4A' }}>场景选择</div>
-                <div className="grid grid-cols-2 gap-2">
-                  {SCENARIOS.map((s) => (
-                    <button 
-                      key={s.id} 
-                      onClick={() => toggleScenario(s.id)}
-                      className="py-2 text-sm rounded-lg transition-all"
-                      style={selectedScenarios.includes(s.id) 
-                        ? { backgroundColor: 'rgba(7, 193, 96, 0.1)', color: COLORS.primary, border: '1px solid rgba(7, 193, 96, 0.5)', boxShadow: '0 0 10px rgba(7, 193, 96, 0.1)' }
-                        : { backgroundColor: '#141414', color: '#666666', border: '1px solid #2C2C2C' }
-                      }
-                    >
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              
               {/* 问题背景 */}
               <div className="flex-1 flex flex-col min-h-0">
                 <div className="text-xs mb-2 uppercase tracking-wider flex items-center justify-between" style={{ color: '#4A4A4A' }}>
@@ -873,6 +851,21 @@ function HomeContent() {
                   disabled={isProcessing} 
                 />
               </div>
+
+              {/* 补充问题 */}
+              <div className="mt-4">
+                <div className="text-xs mb-2 uppercase tracking-wider" style={{ color: '#4A4A4A' }}>
+                  补充问题（可选）
+                </div>
+                <Textarea
+                  placeholder="想让我重点解读什么？比如「这个方案风险怎么样」「我要怎么跟老板汇报」"
+                  value={extraContext}
+                  onChange={(e) => setExtraContext(e.target.value)}
+                  className="min-h-[72px] max-h-[160px] text-sm resize-none overflow-y-auto rounded-lg"
+                  style={{ backgroundColor: '#141414', border: '1px solid #2C2C2C', color: '#FFFFFF' }}
+                  disabled={isProcessing}
+                />
+              </div>
               
               {/* Toolbar */}
               <div className="flex items-center justify-between mt-5 pt-4" style={{ borderTop: '1px solid #1A1A1A' }}>
@@ -902,8 +895,46 @@ function HomeContent() {
             </div>
           </div>
 
+          {/* Resize handle */}
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              isResizingRef.current = true;
+              document.body.style.cursor = 'col-resize';
+              document.body.style.userSelect = 'none';
+
+              const onMove = (ev: MouseEvent) => {
+                if (!isResizingRef.current) return;
+                const next = Math.min(720, Math.max(320, ev.clientX));
+                setLeftWidth(next);
+              };
+              const onUp = () => {
+                isResizingRef.current = false;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                window.removeEventListener('mousemove', onMove);
+                window.removeEventListener('mouseup', onUp);
+              };
+              window.addEventListener('mousemove', onMove);
+              window.addEventListener('mouseup', onUp);
+            }}
+            onDoubleClick={() => setLeftWidth(420)}
+            title="拖拽调整宽度，双击恢复默认"
+            className="shrink-0 cursor-col-resize flex items-center justify-center group"
+            style={{ width: 6, backgroundColor: 'transparent' }}
+          >
+            <div
+              className="h-10 w-[3px] rounded-full transition-colors"
+              style={{ backgroundColor: '#2C2C2C' }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = COLORS.primary)}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#2C2C2C')}
+            />
+          </div>
+
           {/* Right: Results */}
-          <div className="flex-1 flex flex-col overflow-hidden" style={{ backgroundColor: '#000000' }}>
+          <div className="flex-1 min-w-0 flex flex-col overflow-hidden" style={{ backgroundColor: '#000000' }}>
             {/* Topic Title */}
             {topicTitle && (
               <div className="shrink-0 px-6 py-4" style={{ backgroundColor: '#0A0A0A', borderBottom: '1px solid #1A1A1A' }}>
@@ -922,10 +953,13 @@ function HomeContent() {
                 </div>
               )}
 
-              {!isLoadingRecord && (isAnalyzing || isFollowUp) && conversationHistory.length === 0 && (
-                <div className="flex items-center gap-2 text-base" style={{ color: '#666666' }}>
-                  <Loader2 className="w-5 h-5 animate-spin" /><span>分析中...</span>
-                </div>
+              {!isLoadingRecord && (isAnalyzing || isFollowUp || isOcring) && !analysisResult && conversationHistory.length === 0 && (
+                <AnalysisSkeleton
+                  stage={waitingStage}
+                  isOcr={isOcring}
+                  isFollowUp={isFollowUp}
+                  primary={COLORS.primary}
+                />
               )}
 
               {!isLoadingRecord && !isProcessing && conversationHistory.length === 0 && !topicTitle && (
@@ -1030,5 +1064,119 @@ export default function HomePage() {
     <Suspense fallback={<LoadingFallback />}>
       <HomeContent />
     </Suspense>
+  );
+}
+
+// === 等待骨架屏 ==============================================
+const WAIT_STAGES = [
+  '正在读取你提供的内容…',
+  '正在拆解技术术语…',
+  '正在评估当前风险和进展…',
+  '正在整理你需要跟进的事项…',
+  '正在准备可直接使用的话术…',
+];
+
+function AnalysisSkeleton({
+  stage,
+  isOcr,
+  isFollowUp,
+  primary,
+}: {
+  stage: number;
+  isOcr: boolean;
+  isFollowUp: boolean;
+  primary: string;
+}) {
+  const headline = isOcr
+    ? '正在识别图片中的文字…'
+    : isFollowUp
+    ? '老陈正在思考你的追问…'
+    : '老陈正在思考…';
+
+  const subline = WAIT_STAGES[stage] || WAIT_STAGES[0];
+
+  return (
+    <div className="max-w-3xl">
+      <style>{`
+        @keyframes ctoShimmer {
+          0% { background-position: -400px 0; }
+          100% { background-position: 400px 0; }
+        }
+        @keyframes ctoPulse {
+          0%, 100% { opacity: .45; }
+          50% { opacity: 1; }
+        }
+      `}</style>
+
+      {/* 标题行 */}
+      <div className="flex items-center gap-3 mb-6">
+        <span
+          className="inline-block w-2 h-2 rounded-full"
+          style={{ backgroundColor: primary, animation: 'ctoPulse 1.2s ease-in-out infinite' }}
+        />
+        <div>
+          <div className="text-base font-semibold" style={{ color: '#E5E5E5' }}>{headline}</div>
+          <div className="text-xs mt-0.5 transition-opacity" style={{ color: '#666666' }}>{subline}</div>
+        </div>
+      </div>
+
+      {/* 小白版区块骨架 */}
+      <SkeletonBlock title="🙋 小白版" lines={3} primary={primary} />
+      {/* 技术点解读 */}
+      <SkeletonBlock title="技术点解读" lines={4} primary={primary} dotted />
+      {/* 当前进展 */}
+      <SkeletonBlock title="当前进展判断" lines={3} primary={primary} dotted />
+      {/* 你需要跟进的 */}
+      <SkeletonBlock title="⚠️ 你需要跟进的" lines={3} primary={primary} dotted />
+      {/* 建议话术 */}
+      <SkeletonBlock title="💬 建议你这样问" lines={2} primary={primary} />
+    </div>
+  );
+}
+
+function SkeletonBlock({
+  title,
+  lines,
+  primary,
+  dotted = false,
+}: {
+  title: string;
+  lines: number;
+  primary: string;
+  dotted?: boolean;
+}) {
+  const shimmerStyle: React.CSSProperties = {
+    background:
+      'linear-gradient(90deg, #1a1a1a 0%, #262626 50%, #1a1a1a 100%)',
+    backgroundSize: '400px 100%',
+    animation: 'ctoShimmer 1.6s linear infinite',
+    borderRadius: 6,
+    height: 10,
+  };
+  return (
+    <div className="mb-6">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="w-1 h-4 rounded-full" style={{ backgroundColor: primary }} />
+        <span className="text-sm font-semibold" style={{ color: '#9A9A9A' }}>{title}</span>
+      </div>
+      <div className="space-y-2.5 pl-3">
+        {Array.from({ length: lines }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3">
+            {dotted && (
+              <span
+                className="w-1 h-1 rounded-full shrink-0"
+                style={{ backgroundColor: '#2C2C2C' }}
+              />
+            )}
+            <div
+              style={{
+                ...shimmerStyle,
+                width: `${72 - (i % 3) * 10}%`,
+              }}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
