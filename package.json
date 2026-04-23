@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "build": "bash ./scripts/build.sh",
+    "build:vercel": "next build",
     "dev": "bash ./scripts/dev.sh",
     "preinstall": "npx only-allow pnpm",
     "lint": "eslint",
