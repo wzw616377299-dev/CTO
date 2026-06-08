@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { tokenhub } from '@/lib/tokenhub-client';
-import { getModelConfig } from '@/config/model.config';
+import { getModelChain } from '@/config/model.config';
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,14 +27,11 @@ export async function POST(request: NextRequest) {
       },
     ];
 
-    // 使用轻量模型生成标题，更快更省
-    const modelConfig = getModelConfig('title');
+    // 使用 title 候选链（自动降级）
+    const titleChain = getModelChain('title');
 
     let title = '';
-    const stream = tokenhub.stream(messages, {
-      model: modelConfig.model,
-      temperature: modelConfig.temperature,
-    });
+    const stream = tokenhub.streamWithFallback(messages, titleChain);
 
     for await (const chunk of stream) {
       if (chunk.content) {

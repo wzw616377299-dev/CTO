@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { tokenhub } from '@/lib/tokenhub-client';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
-import { getModelConfig } from '@/config/model.config';
+import { getModelChain } from '@/config/model.config';
 
 /**
  * 老陈 · 产品经理的随身 CTO —— 统一 System Prompt
@@ -122,8 +122,8 @@ export async function POST(request: NextRequest) {
       ];
     }
 
-    // 统一使用 primary 模型（无场景分流）
-    const modelConfig = getModelConfig('primary');
+    // 统一使用 primary 候选链（自动降级：deepseek → kimi → hunyuan → glm）
+    const primaryChain = getModelChain('primary');
 
     // 识别「反问 / 要求用户补充」类开头，避免模型跳过 SKILL 模板
     const BAD_PATTERNS = [
@@ -166,10 +166,7 @@ export async function POST(request: NextRequest) {
           let headBuffer = '';
           let badDetected = false;
 
-          const firstStream = tokenhub.stream(messages, {
-            model: modelConfig.model,
-            temperature: modelConfig.temperature,
-          });
+          const firstStream = tokenhub.streamWithFallback(messages, primaryChain);
 
           for await (const chunk of firstStream) {
             if (!chunk.content) continue;
@@ -207,12 +204,9 @@ export async function POST(request: NextRequest) {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ reset: true })}\n\n`));
             fullContent = '';
 
-            // 重试仍然流式，保证用户看得见进度
-            const retryStream = tokenhub.stream(retryMessages, {
-              model: modelConfig.model,
-              temperature: modelConfig.temperature,
-              maxTokens: 700,
-            });
+            // 重试仍然流式，保证用户看得见进度（同样带降级）
+            const retryChain = primaryChain.map(m => ({ ...m, maxTokens: 700 }));
+            const retryStream = tokenhub.streamWithFallback(retryMessages, retryChain);
             for await (const chunk of retryStream) {
               if (!chunk.content) continue;
               fullContent += chunk.content;
